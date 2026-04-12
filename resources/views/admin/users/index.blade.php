@@ -59,8 +59,8 @@
         </table>
     </div>
     @if($users->hasPages())
-    <div class="card-footer bg-white border-0 d-flex justify-content-center">
-        {{ $users->links() }}
+    <div class="card-footer bg-white border-0 d-flex justify-content-center py-3">
+        {{ $users->onEachSide(1)->links() }}
     </div>
     @endif
 </div>

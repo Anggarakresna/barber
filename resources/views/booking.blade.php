@@ -105,20 +105,6 @@
             </button>
         </form>
 
-        <!-- Booking Info -->
-        <div class="alert alert-info mt-4" role="alert">
-            <h5 class="alert-heading">
-                <i class="fas fa-info-circle"></i> Informasi Penting
-            </h5>
-            <ul class="mb-0">
-                <li>Booking online memerlukan konfirmasi dari barber</li>
-                <li>Anda akan menerima notifikasi via email setelah konfirmasi</li>
-                <li>Jika ingin cancel, hubungi kami minimal 1 jam sebelumnya</li>
-                <li>Datang 5 menit lebih awal dari jadwal</li>
-            </ul>
-        </div>
-    </div>
-</div>
 @endsection
 
 @section('scripts')

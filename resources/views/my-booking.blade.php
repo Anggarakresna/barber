@@ -24,7 +24,7 @@
     </div>
 @endif
 
-@if($bookings->isEmpty())
+@if($bookings->total() === 0)
     <div class="card border-0 shadow-sm">
         <div class="card-body text-center py-5">
             <i class="fas fa-calendar-times text-muted" style="font-size: 4rem;"></i>
@@ -52,9 +52,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($bookings as $index => $booking)
+                        @foreach($bookings as $booking)
                             <tr>
-                                <td>{{ $index + 1 }}</td>
+                                <td>{{ ($bookings->currentPage() - 1) * $bookings->perPage() + $loop->iteration }}</td>
                                 <td>{{ $booking->service->name ?? '-' }}</td>
                                 <td>{{ $booking->barber->user->name ?? '-' }}</td>
                                 <td>{{ $booking->booking_date->format('d M Y') }}</td>
@@ -97,6 +97,11 @@
                 </table>
             </div>
         </div>
+        @if($bookings->hasPages())
+            <div class="card-footer bg-white border-0 d-flex justify-content-center py-3">
+                {{ $bookings->onEachSide(1)->links() }}
+            </div>
+        @endif
     </div>
 @endif
 @endsection

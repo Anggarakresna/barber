@@ -215,6 +215,35 @@
             padding: 2rem 0;
         }
 
+        /* Pagination */
+        .pagination {
+            --bs-pagination-color: #c82333;
+            --bs-pagination-hover-color: #fff;
+            --bs-pagination-focus-color: #fff;
+            --bs-pagination-active-bg: #dc3545;
+            --bs-pagination-active-border-color: #dc3545;
+            --bs-pagination-hover-bg: #dc3545;
+            --bs-pagination-hover-border-color: #dc3545;
+            --bs-pagination-focus-bg: #dc3545;
+            --bs-pagination-focus-border-color: #dc3545;
+            --bs-pagination-focus-box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.2);
+        }
+
+        .pagination .page-link {
+            border-radius: 0.5rem;
+            margin: 0 0.2rem;
+            min-width: 2.4rem;
+            text-align: center;
+            font-weight: 600;
+            border-width: 1px;
+        }
+
+        .pagination .page-item.disabled .page-link {
+            color: #9ca3af;
+            background-color: #f8f9fa;
+            border-color: #e5e7eb;
+        }
+
         /* Footer */
         .footer-barbershop {
             background-color: #1a1a1a;

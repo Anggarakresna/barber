@@ -81,8 +81,8 @@
         </table>
     </div>
     @if($barbers->hasPages())
-    <div class="card-footer bg-white border-0 d-flex justify-content-center">
-        {{ $barbers->links() }}
+    <div class="card-footer bg-white border-0 d-flex justify-content-center py-3">
+        {{ $barbers->onEachSide(1)->links() }}
     </div>
     @endif
 </div>

@@ -95,7 +95,7 @@ class BookingController extends Controller
             ->where('user_id', Auth::id())
             ->orderByDesc('booking_date')
             ->orderByDesc('booking_time')
-            ->get();
+            ->paginate(5);
 
         return view('my-booking', compact('bookings'));
     }

@@ -76,8 +76,8 @@
     </div>
 
     @if($feedbacks->hasPages())
-    <div class="card-footer bg-white border-0 d-flex justify-content-center">
-        {{ $feedbacks->links() }}
+    <div class="card-footer bg-white border-0 d-flex justify-content-center py-3">
+        {{ $feedbacks->onEachSide(1)->links() }}
     </div>
     @endif
 </div>

@@ -10,7 +10,7 @@ class BranchController extends Controller
 {
     public function index()
     {
-        $branches = Branch::withCount('barbers')->latest()->paginate(10);
+        $branches = Branch::withCount('barbers')->latest()->paginate(5);
         return view('admin.branches.index', compact('branches'));
     }
 

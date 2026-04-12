@@ -19,16 +19,18 @@ class BarberDashboardController extends Controller
             return redirect()->route('home')->with('error', 'Profil barber Anda belum terdaftar. Hubungi admin.');
         }
 
-        $bookings = Booking::with(['user', 'service'])
-            ->where('barber_id', $barber->id)
+        $bookingsQuery = Booking::with(['user', 'service'])
+            ->where('barber_id', $barber->id);
+
+        $bookings = (clone $bookingsQuery)
             ->orderByDesc('booking_date')
             ->orderBy('booking_time')
-            ->get();
+            ->paginate(5);
 
-        $totalBookings    = $bookings->count();
-        $completedBookings = $bookings->where('status', 'completed')->count();
-        $pendingBookings  = $bookings->where('status', 'pending')->count();
-        $confirmedBookings = $bookings->where('status', 'confirmed')->count();
+        $totalBookings = (clone $bookingsQuery)->count();
+        $completedBookings = (clone $bookingsQuery)->where('status', 'completed')->count();
+        $pendingBookings = (clone $bookingsQuery)->where('status', 'pending')->count();
+        $confirmedBookings = (clone $bookingsQuery)->where('status', 'confirmed')->count();
 
         return view('dashboard.barber', compact(
             'barber',

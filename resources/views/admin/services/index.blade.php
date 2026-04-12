@@ -62,8 +62,8 @@
         </table>
     </div>
     @if($services->hasPages())
-    <div class="card-footer bg-white border-0 d-flex justify-content-center">
-        {{ $services->links() }}
+    <div class="card-footer bg-white border-0 d-flex justify-content-center py-3">
+        {{ $services->onEachSide(1)->links() }}
     </div>
     @endif
 </div>

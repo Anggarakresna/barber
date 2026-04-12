@@ -126,8 +126,8 @@
         </table>
     </div>
     @if($recentBookings->hasPages())
-    <div class="card-footer bg-white border-0 d-flex justify-content-center">
-        {{ $recentBookings->links() }}
+    <div class="card-footer bg-white border-0 d-flex justify-content-center py-3">
+        {{ $recentBookings->onEachSide(1)->links() }}
     </div>
     @endif
 </div>

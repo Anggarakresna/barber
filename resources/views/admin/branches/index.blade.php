@@ -59,8 +59,8 @@
         </table>
     </div>
     @if($branches->hasPages())
-    <div class="card-footer bg-white border-0 d-flex justify-content-center">
-        {{ $branches->links() }}
+    <div class="card-footer bg-white border-0 d-flex justify-content-center py-3">
+        {{ $branches->onEachSide(1)->links() }}
     </div>
     @endif
 </div>

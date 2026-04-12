@@ -13,7 +13,7 @@ class BarberController extends Controller
 {
     public function index()
     {
-        $barbers = Barber::with(['user', 'branch'])->latest()->paginate(10);
+        $barbers = Barber::with(['user', 'branch'])->latest()->paginate(5);
         return view('admin.barbers.index', compact('barbers'));
     }
 

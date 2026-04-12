@@ -94,9 +94,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($bookings as $i => $booking)
+                        @forelse($bookings as $booking)
                         <tr>
-                            <td>{{ $i + 1 }}</td>
+                            <td>{{ ($bookings->currentPage() - 1) * $bookings->perPage() + $loop->iteration }}</td>
                             <td>
                                 <i class="fas fa-user-circle text-muted me-1"></i>
                                 {{ $booking->user->name }}
@@ -155,6 +155,11 @@
                     </tbody>
                 </table>
             </div>
+            @if($bookings->hasPages())
+                <div class="card-footer bg-white border-0 d-flex justify-content-center py-3">
+                    {{ $bookings->onEachSide(1)->links() }}
+                </div>
+            @endif
         </div>
     </div>
 </div>
