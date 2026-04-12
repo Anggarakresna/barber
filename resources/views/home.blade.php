@@ -123,7 +123,6 @@
     @endif
 </section>
 
-3
 <!-- CTA Section -->
 <section class="mt-5 pt-5 bg-light rounded p-5 text-center">
     <h2 class="fw-bold mb-3">Ready for Your Next Haircut?</h2>
