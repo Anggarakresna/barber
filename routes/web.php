@@ -3,16 +3,22 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Admin\GalleryController as AdminGalleryController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\BarberController as AdminBarberController;
 use App\Http\Controllers\Admin\BranchController as AdminBranchController;
+use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\BarberDashboardController;
 
 // Home route
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// Feedback Routes (Guest + Customer)
+Route::get('/feedback', [FeedbackController::class, 'create'])->name('feedback.create');
+Route::post('/feedback', [FeedbackController::class, 'store'])->name('feedback.store');
 
 // Public Routes (Authentication)
 Route::middleware('guest')->group(function () {
@@ -82,6 +88,11 @@ Route::middleware(['auth.check', 'role:admin'])->prefix('admin')->name('admin.')
     Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
     Route::patch('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.updateRole');
     Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
+
+    // Feedback Management
+    Route::get('/feedback', [AdminFeedbackController::class, 'index'])->name('feedback.index');
+    Route::patch('/feedback/{feedback}/read', [AdminFeedbackController::class, 'markAsRead'])->name('feedback.read');
+    Route::delete('/feedback/{feedback}', [AdminFeedbackController::class, 'destroy'])->name('feedback.destroy');
 });
 
 // Barber Routes

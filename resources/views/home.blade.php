@@ -10,7 +10,8 @@
             Premium Barbershop Experience
         </h1>
         <p class="lead text-muted mb-4">
-            Dapatkan potongan rambut terbaik dari barber berpengalaman kami. Kami menawarkan layanan grooming berkualitas tinggi dengan sentuhan profesional.
+            Dapatkan potongan rambut terbaik dari barber berpengalaman kami. Kami menawarkan layanan grooming
+            berkualitas tinggi dengan sentuhan profesional.
         </p>
         <div class="d-flex gap-3 flex-wrap">
             <a href="{{ route('booking') }}" class="btn btn-sign-in btn-lg">
@@ -21,14 +22,6 @@
             </a>
         </div>
     </div>
-
-    {{-- <!-- Hero Image -->
-    <div class="col-lg-6">
-        <div class="bg-light p-5 rounded text-center">
-            <img src="https://images.unsplash.com/photo-1607608301394-74bab19db575?w=500&h=500&fit=crop" 
-                 alt="Barber" class="img-fluid rounded" style="max-width: 400px;">
-        </div>
-    </div> --}}
 </div>
 
 <!-- Services Preview -->
@@ -39,7 +32,8 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100">
                 @if($service->image)
-                    <img src="{{ asset('storage/' . $service->image) }}" class="card-img-top" alt="{{ $service->name }}" style="height: 200px; object-fit: cover;">
+                <img src="{{ asset('storage/' . $service->image) }}" class="card-img-top" alt="{{ $service->name }}"
+                    style="height: 200px; object-fit: cover;">
                 @endif
                 <div class="card-body text-center">
                     <h5 class="card-title"><i class="fas fa-cut text-danger"></i> {{ $service->name }}</h5>
@@ -70,19 +64,20 @@
             <div class="card border-0 shadow-sm h-100 text-center">
                 <div class="card-body">
                     @if($barber->photo)
-                        <img src="{{ asset('storage/' . $barber->photo) }}" alt="{{ $barber->user->name }}"
-                             class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    <img src="{{ asset('storage/' . $barber->photo) }}" alt="{{ $barber->user->name }}"
+                        class="rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
                     @else
-                        <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white mx-auto mb-3" style="width:150px;height:150px;">
-                            <i class="fas fa-user" style="font-size: 3rem;"></i>
-                        </div>
+                    <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white mx-auto mb-3"
+                        style="width:150px;height:150px;">
+                        <i class="fas fa-user" style="font-size: 3rem;"></i>
+                    </div>
                     @endif
                     <h5 class="card-title fw-bold">{{ $barber->user->name }}</h5>
                     <p class="card-text text-muted small">{{ Str::limit($barber->bio, 100) ?? '' }}</p>
                     @if($barber->is_active)
-                        <span class="badge bg-success">Aktif</span>
+                    <span class="badge bg-success">Aktif</span>
                     @else
-                        <span class="badge bg-secondary">Libur</span>
+                    <span class="badge bg-secondary">Libur</span>
                     @endif
                 </div>
             </div>
@@ -106,8 +101,10 @@
         @forelse($galleries as $gallery)
         <div class="col-md-3">
             <div class="card border-0 shadow-sm overflow-hidden">
-                <div style="height: 220px; background: #111; display: flex; align-items: center; justify-content: center;">
-                    <img src="{{ asset('storage/' . $gallery->image) }}" class="img-fluid" alt="{{ $gallery->title }}" style="max-height: 220px; max-width: 100%; object-fit: contain;">
+                <div
+                    style="height: 220px; background: #111; display: flex; align-items: center; justify-content: center;">
+                    <img src="{{ asset('storage/' . $gallery->image) }}" class="img-fluid" alt="{{ $gallery->title }}"
+                        style="max-height: 220px; max-width: 100%; object-fit: contain;">
                 </div>
                 <div class="card-body text-center py-2">
                     <small class="fw-bold">{{ $gallery->title }}</small>
@@ -126,10 +123,12 @@
     @endif
 </section>
 
+3
 <!-- CTA Section -->
 <section class="mt-5 pt-5 bg-light rounded p-5 text-center">
     <h2 class="fw-bold mb-3">Ready for Your Next Haircut?</h2>
-    <p class="lead text-muted mb-4">Booking sekarang dan dapatkan potongan rambut terbaik dari barber profesional kami!</p>
+    <p class="lead text-muted mb-4">Booking sekarang dan dapatkan potongan rambut terbaik dari barber profesional kami!
+    </p>
     <a href="{{ route('booking') }}" class="btn btn-danger btn-lg">
         <i class="fas fa-calendar-plus"></i> Book Now
     </a>

@@ -67,6 +67,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get all feedback entries submitted by this user.
+     */
+    public function feedbacks(): HasMany
+    {
+        return $this->hasMany(Feedback::class);
+    }
+
+    /**
      * Check if user is admin.
      */
     public function isAdmin(): bool

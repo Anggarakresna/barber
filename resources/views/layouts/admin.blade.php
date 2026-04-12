@@ -120,6 +120,11 @@
                     <i class="fas fa-users"></i> Users
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link {{ Route::is('admin.feedback.*') ? 'active' : '' }}" href="{{ route('admin.feedback.index') }}">
+                    <i class="fas fa-comments"></i> Manage Feedback
+                </a>
+            </li>
             <li class="nav-item mt-4">
                 <a class="nav-link" href="{{ route('home') }}">
                     <i class="fas fa-globe"></i> View Website

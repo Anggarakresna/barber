@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/x-icon" sizes="16x16" href="{{ asset('favicon.ico') }}">
 
     <title>@yield('title', 'Barbershop') - {{ config('app.name', 'Laravel') }}</title>
 
@@ -291,11 +292,15 @@
                             <li class="nav-item">
                                 <a class="nav-link {{ Route::is('gallery') ? 'active' : '' }}" href="{{ route('gallery') }}">Gallery</a>
                             </li>
+        
                             <li class="nav-item">
                                 <a class="nav-link {{ Route::is('booking') ? 'active' : '' }}" href="{{ route('booking') }}">Booking</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link {{ Route::is('my-booking') ? 'active' : '' }}" href="{{ route('my-booking') }}">My Booking</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {{ Route::is('feedback.*') ? 'active' : '' }}" href="{{ route('feedback.create') }}">Feedback</a>
                             </li>
                         @endif
                     @else
@@ -311,6 +316,9 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {{ Route::is('gallery') ? 'active' : '' }}" href="{{ route('gallery') }}">Gallery</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ Route::is('feedback.*') ? 'active' : '' }}" href="{{ route('feedback.create') }}">Feedback</a>
                         </li>
                     @endauth
                 </ul>
