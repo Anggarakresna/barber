@@ -19,7 +19,13 @@ class ServiceSeeder extends Seeder
         ];
 
         foreach ($services as $service) {
-            Service::create($service);
+            Service::updateOrCreate(
+                ['name' => $service['name']],
+                [
+                    'price' => $service['price'],
+                    'duration' => $service['duration'],
+                ]
+            );
         }
     }
 }

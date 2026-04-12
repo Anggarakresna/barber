@@ -19,11 +19,13 @@ class BarberSeeder extends Seeder
         foreach ($barbers as $data) {
             $user = User::where('email', $data['email'])->first();
             if ($user) {
-                Barber::create([
-                    'user_id' => $user->id,
-                    'phone' => $data['phone'],
-                    'experience' => $data['experience'],
-                ]);
+                Barber::updateOrCreate(
+                    ['user_id' => $user->id],
+                    [
+                        'phone' => $data['phone'],
+                        'experience' => $data['experience'],
+                    ]
+                );
             }
         }
     }
