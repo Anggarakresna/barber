@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Gallery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Storage;
 
 class GalleryController extends Controller
 {
@@ -65,36 +64,27 @@ class GalleryController extends Controller
     }
 
     /**
-     * Decode a base64 data-URL and save it as a file on the public disk.
+     * Decode a base64 data-URL and save it as a file to public/images folder.
      */
     private function saveBase64Image(string $base64, string $directory): string
     {
         preg_match('/^data:image\/(\w+);base64,/', $base64, $matches);
         $ext       = isset($matches[1]) ? ($matches[1] === 'jpeg' ? 'jpg' : $matches[1]) : 'jpg';
         $imageData = base64_decode(preg_replace('/^data:image\/\w+;base64,/', '', $base64));
-        $filename  = $directory . '/' . uniqid() . '.' . $ext;
+        $filename  = uniqid() . '.' . $ext;
 
-        // Keep Laravel storage disk as the primary location.
-        Storage::disk('public')->put($filename, $imageData);
-
-        // Mirror file to public/storage so images stay accessible on hosts without storage:link.
-        $publicStoragePath = public_path('storage/' . $filename);
-        $publicStorageDir  = dirname($publicStoragePath);
-        if (!File::exists($publicStorageDir)) {
-            File::makeDirectory($publicStorageDir, 0755, true);
-        }
-        File::put($publicStoragePath, $imageData);
+        // Save directly to public/images for simplicity
+        $publicImagesPath = public_path('images/' . $filename);
+        File::put($publicImagesPath, $imageData);
 
         return $filename;
     }
 
-    private function deleteGalleryImage(string $path): void
+    private function deleteGalleryImage(string $filename): void
     {
-        Storage::disk('public')->delete($path);
-
-        $publicStoragePath = public_path('storage/' . ltrim($path, '/'));
-        if (File::exists($publicStoragePath)) {
-            File::delete($publicStoragePath);
+        $publicImagesPath = public_path('images/' . $filename);
+        if (File::exists($publicImagesPath)) {
+            File::delete($publicImagesPath);
         }
     }
 

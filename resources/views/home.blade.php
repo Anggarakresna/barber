@@ -103,7 +103,7 @@
             <div class="card border-0 shadow-sm overflow-hidden">
                 <div
                     style="height: 220px; background: #111; display: flex; align-items: center; justify-content: center;">
-                    <img src="{{ asset('storage/' . $gallery->image) }}" class="img-fluid" alt="{{ $gallery->title }}"
+                    <img src="{{ asset('images/' . $gallery->image) }}" class="img-fluid" alt="{{ $gallery->title }}"
                         style="max-height: 220px; max-width: 100%; object-fit: contain;">
                 </div>
                 <div class="card-body text-center py-2">
