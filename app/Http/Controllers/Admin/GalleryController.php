@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Gallery;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 
 class GalleryController extends Controller
@@ -53,7 +54,7 @@ class GalleryController extends Controller
 
         if ($request->filled('cropped_image')) {
             if ($gallery->image) {
-                Storage::disk('public')->delete($gallery->image);
+                $this->deleteGalleryImage($gallery->image);
             }
             $data['image'] = $this->saveBase64Image($request->input('cropped_image'), 'gallery');
         }
@@ -72,14 +73,35 @@ class GalleryController extends Controller
         $ext       = isset($matches[1]) ? ($matches[1] === 'jpeg' ? 'jpg' : $matches[1]) : 'jpg';
         $imageData = base64_decode(preg_replace('/^data:image\/\w+;base64,/', '', $base64));
         $filename  = $directory . '/' . uniqid() . '.' . $ext;
+
+        // Keep Laravel storage disk as the primary location.
         Storage::disk('public')->put($filename, $imageData);
+
+        // Mirror file to public/storage so images stay accessible on hosts without storage:link.
+        $publicStoragePath = public_path('storage/' . $filename);
+        $publicStorageDir  = dirname($publicStoragePath);
+        if (!File::exists($publicStorageDir)) {
+            File::makeDirectory($publicStorageDir, 0755, true);
+        }
+        File::put($publicStoragePath, $imageData);
+
         return $filename;
+    }
+
+    private function deleteGalleryImage(string $path): void
+    {
+        Storage::disk('public')->delete($path);
+
+        $publicStoragePath = public_path('storage/' . ltrim($path, '/'));
+        if (File::exists($publicStoragePath)) {
+            File::delete($publicStoragePath);
+        }
     }
 
     public function destroy(Gallery $gallery)
     {
         if ($gallery->image) {
-            Storage::disk('public')->delete($gallery->image);
+            $this->deleteGalleryImage($gallery->image);
         }
 
         $gallery->delete();

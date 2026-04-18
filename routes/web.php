@@ -114,5 +114,27 @@ Route::get('/barbers', function () {
 
 Route::get('/gallery', function () {
     $galleries = \App\Models\Gallery::latest()->get();
+
+    $publicGalleryPath = public_path('storage/gallery');
+    if (is_dir($publicGalleryPath)) {
+        $files = collect(scandir($publicGalleryPath))
+            ->reject(fn($file) => in_array($file, ['.', '..'], true))
+            ->values();
+
+        foreach ($files as $file) {
+            $relativePath = 'gallery/' . $file;
+
+            if (!$galleries->contains('image', $relativePath)) {
+                $galleries->push((object) [
+                    'title' => \Illuminate\Support\Str::of(pathinfo($file, PATHINFO_FILENAME))
+                        ->replace(['-', '_'], ' ')
+                        ->title()
+                        ->toString(),
+                    'image' => $relativePath,
+                ]);
+            }
+        }
+    }
+
     return view('gallery', compact('galleries'));
 })->name('gallery');
