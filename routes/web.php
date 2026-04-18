@@ -114,13 +114,13 @@ Route::get('/barbers', function () {
 
 Route::get('/gallery', function () {
     $galleries = collect([
-        (object) ['title' => 'Braids', 'image' => 'gallery/braided-style-20260419.png'],
-        (object) ['title' => 'Wolfcut', 'image' => 'gallery/yellow-dreadlocks-20260419.jpg'],
-        (object) ['title' => 'Curly Mullet', 'image' => 'gallery/curly-mullet-side-20260419.png'],
-        (object) ['title' => 'Side Part', 'image' => 'gallery/icy-blue-spiky-20260419.avif'],
-        (object) ['title' => 'Hair Coloring', 'image' => 'gallery/classic-sidepart-redbg-20260419.avif'],
-        (object) ['title' => 'Dreadlocks', 'image' => 'gallery/layered-wolfcut-20260419.avif'],
-    ])->filter(fn($item) => file_exists(public_path('storage/' . $item->image)))->values();
+        (object) ['title' => 'Braids', 'image' => 'braided-style-20260419.png'],
+        (object) ['title' => 'Wolfcut', 'image' => 'yellow-dreadlocks-20260419.jpg'],
+        (object) ['title' => 'Curly Mullet', 'image' => 'curly-mullet-side-20260419.png'],
+        (object) ['title' => 'Side Part', 'image' => 'icy-blue-spiky-20260419.avif'],
+        (object) ['title' => 'Hair Coloring', 'image' => 'classic-sidepart-redbg-20260419.avif'],
+        (object) ['title' => 'Dreadlocks', 'image' => 'layered-wolfcut-20260419.avif'],
+    ]);
 
     return view('gallery', compact('galleries'));
 })->name('gallery');
