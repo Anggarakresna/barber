@@ -28,8 +28,7 @@
                 <img src="{{ asset('storage/gallery/' . $gallery->image) }}" 
                      alt="{{ $gallery->title }}" 
                      class="img-fluid"
-                     style="width: 100%; height: 100%; max-height: 350px; object-fit: contain; display: block; margin: auto;"
-                     onerror="this.src='{{ asset('images/logo.png') }}'; this.style.opacity='0.3';">
+                     style="width: 100%; height: 100%; max-height: 350px; object-fit: contain; display: block; margin: auto;">
                 
                 <div class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-0 d-flex align-items-end p-3"
                      style="transition: all 0.3s ease;">
@@ -63,21 +62,17 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-0">
-                <img id="modalImage" src="" alt="" class="img-fluid w-100" onerror="this.src='{{ asset('images/logo.png') }}'; this.style.opacity='0.3';">
+                <img id="modalImage" src="" alt="" class="img-fluid w-100">
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // Modal update function dengan error handling
+    // Modal update function
     function updateModal(image, title) {
         const img = document.getElementById('modalImage');
         img.src = image;
-        img.onerror = function() {
-            this.src = '{{ asset('images/logo.png') }}';
-            this.style.opacity = '0.3';
-        };
         document.getElementById('modalTitle').textContent = title;
     }
 
