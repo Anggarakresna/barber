@@ -3,6 +3,20 @@
 @section('title', 'Gallery')
 
 @section('content')
+@php
+    // Permanent gallery list with hosting-safe paths under public/storage/gallery.
+    $galleryItems = collect([
+        (object) ['title' => 'Braids', 'image' => 'gallery/braided-style-20260419.png'],
+        (object) ['title' => 'Wolfcut', 'image' => 'gallery/yellow-dreadlocks-20260419.jpg'],
+        (object) ['title' => 'Curly Mullet', 'image' => 'gallery/curly-mullet-side-20260419.png'],
+        (object) ['title' => 'Side Part', 'image' => 'gallery/icy-blue-spiky-20260419.avif'],
+        (object) ['title' => 'Hair Coloring', 'image' => 'gallery/classic-sidepart-redbg-20260419.avif'],
+        (object) ['title' => 'Dreadlocks', 'image' => 'gallery/layered-wolfcut-20260419.avif'],
+    ])
+        ->filter(fn ($item) => file_exists(public_path('storage/' . $item->image)))
+        ->values();
+@endphp
+
 <div class="row mb-5">
     <div class="col-lg-8">
         <h1 class="fw-bold mb-3">Our Gallery</h1>
@@ -13,13 +27,13 @@
 <!-- Gallery Filter -->
 <div class="row mb-4">
     <div class="col-12">
-        <p class="text-muted">Total: {{ $galleries->count() }} foto</p>
+        <p class="text-muted">Total: {{ $galleryItems->count() }} foto</p>
     </div>
 </div>
 
 <!-- Gallery Grid -->
 <div class="row g-3">
-    @forelse($galleries as $item)
+    @forelse($galleryItems as $item)
     <div class="col-md-6 col-lg-4 gallery-item">
         <div class="position-relative rounded overflow-hidden" style="background: #111; min-height: 260px; cursor: pointer;"
              data-bs-toggle="modal" data-bs-target="#galleryModal" 
