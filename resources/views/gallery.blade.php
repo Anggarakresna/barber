@@ -24,8 +24,8 @@
         <div class="col-md-6 col-lg-4 gallery-item">
             <div class="position-relative rounded overflow-hidden" style="background: #111; min-height: 260px; cursor: pointer;"
                  data-bs-toggle="modal" data-bs-target="#galleryModal" 
-                 onclick="updateModal('{{ asset('storage/gallery/' . $gallery->image) }}', '{{ $gallery->title }}')">
-                <img src="{{ asset('storage/gallery/' . $gallery->image) }}" 
+                 onclick="updateModal('{{ asset('storage/' . $gallery->image) }}', '{{ $gallery->title }}')">
+                <img src="{{ asset('storage/' . $gallery->image) }}" 
                      alt="{{ $gallery->title }}" 
                      class="img-fluid"
                      style="width: 100%; height: 100%; max-height: 350px; object-fit: contain; display: block; margin: auto;">
