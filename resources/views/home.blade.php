@@ -94,34 +94,6 @@
     @endif
 </section>
 
-<!-- Gallery Preview -->
-<section class="mt-5 pt-5">
-    <h2 class="text-center fw-bold mb-5">Our Gallery</h2>
-    <div class="row g-3">
-        @forelse($galleries as $gallery)
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm overflow-hidden">
-                <div
-                    style="height: 220px; background: #111; display: flex; align-items: center; justify-content: center;">
-                    <img src="{{ asset('images/' . $gallery->image) }}" class="img-fluid" alt="{{ $gallery->title }}"
-                        style="max-height: 220px; max-width: 100%; object-fit: contain;">
-                </div>
-                <div class="card-body text-center py-2">
-                    <small class="fw-bold">{{ $gallery->title }}</small>
-                </div>
-            </div>
-        </div>
-        @empty
-        @endforelse
-    </div>
-    @if($galleries->count())
-    <div class="text-center mt-4">
-        <a href="{{ route('gallery') }}" class="btn btn-outline-danger btn-lg">
-            View Gallery <i class="fas fa-arrow-right ms-2"></i>
-        </a>
-    </div>
-    @endif
-</section>
 
 <!-- CTA Section -->
 <section class="mt-5 pt-5 bg-light rounded p-5 text-center">
