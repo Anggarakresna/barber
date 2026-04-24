@@ -10,6 +10,25 @@ class Booking extends Model
 {
     use HasFactory;
 
+    public const STATUS_WAITING_PAYMENT = 'waiting_payment';
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_CONFIRMED = 'confirmed';
+    public const STATUS_PROCESSING = 'processing';
+    public const STATUS_COMPLETED = 'completed';
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const PAYMENT_STATUS_UNPAID = 'unpaid';
+    public const PAYMENT_STATUS_PAID = 'paid';
+    public const PAYMENT_STATUS_EXPIRED = 'expired';
+    public const PAYMENT_STATUS_CANCELLED = 'cancelled';
+
+    public const ACTIVE_STATUSES = [
+        self::STATUS_WAITING_PAYMENT,
+        self::STATUS_PENDING,
+        self::STATUS_CONFIRMED,
+        self::STATUS_PROCESSING,
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -21,6 +40,13 @@ class Booking extends Model
         'service_id',
         'booking_date',
         'booking_time',
+        'total_people',
+        'payment_status',
+        'midtrans_order_id',
+        'midtrans_snap_token',
+        'payment_deadline',
+        'payment_expired_at',
+        'dp_amount',
         'status',
     ];
 
@@ -32,6 +58,10 @@ class Booking extends Model
     protected $casts = [
         'booking_date' => 'date',
         'booking_time' => 'datetime:H:i',
+        'total_people' => 'integer',
+        'payment_deadline' => 'datetime',
+        'payment_expired_at' => 'datetime',
+        'dp_amount' => 'integer',
     ];
 
     /**
@@ -64,6 +94,22 @@ class Booking extends Model
     public function scopeByStatus($query, $status)
     {
         return $query->where('status', $status);
+    }
+
+    /**
+     * Scope: Get bookings that still occupy a slot.
+     */
+    public function scopeActive($query)
+    {
+        return $query->whereIn('status', self::ACTIVE_STATUSES);
+    }
+
+    /**
+     * Scope: Get active bookings for a specific user.
+     */
+    public function scopeActiveForUser($query, int $userId)
+    {
+        return $query->where('user_id', $userId)->active();
     }
 
     /**

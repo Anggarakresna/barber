@@ -40,7 +40,7 @@ class AuthController extends Controller
         // Login user
         Auth::login($user);
 
-        return redirect()->intended(route('home'))->with('success', 'Registration successful! Welcome to BarberShop!');
+        return redirect()->intended(route('home'))->with('success', 'Registrasi berhasil! Selamat datang di web barbershop kami!');
     }
 
     /**
@@ -68,10 +68,10 @@ class AuthController extends Controller
             // Redirect based on user role
             $user = Auth::user();
             return match ($user->role) {
-                'admin' => redirect()->route('admin.dashboard')->with('success', 'Login successful!'),
-                'barber' => redirect()->route('barber.dashboard')->with('success', 'Login successful!'),
-                'customer' => redirect()->intended(route('home'))->with('success', 'Login successful!'),
-                default => redirect()->intended(route('home'))->with('success', 'Login successful!'),
+                'admin' => redirect()->route('admin.dashboard')->with('success', 'Login berhasil!'),
+                'barber' => redirect()->route('barber.dashboard')->with('success', 'Login berhasil!'),
+                'customer' => redirect()->intended(route('home'))->with('success', 'Login berhasil!'),
+                default => redirect()->intended(route('home'))->with('success', 'Login berhasil!'),
             };
         }
 
@@ -79,7 +79,7 @@ class AuthController extends Controller
         return back()
             ->withInput($request->only('email'))
             ->withErrors([
-                'email' => 'The provided credentials do not match our records.',
+                'email' => 'Email dan password tidak sesuai.',
             ]);
     }
 
@@ -92,7 +92,7 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('home')->with('success', 'Logout successful!');
+        return redirect()->route('home')->with('success', 'Logout berhasil!');
     }
 
     /**

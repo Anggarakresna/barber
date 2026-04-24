@@ -19,6 +19,7 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 // Feedback Routes (Guest + Customer)
 Route::get('/feedback', [FeedbackController::class, 'create'])->name('feedback.create');
 Route::post('/feedback', [FeedbackController::class, 'store'])->name('feedback.store');
+Route::post('/midtrans/callback', [BookingController::class, 'midtransWebhook'])->name('midtrans.callback');
 
 // Public Routes (Authentication)
 Route::middleware('guest')->group(function () {
@@ -36,8 +37,16 @@ Route::middleware('auth.check')->group(function () {
     Route::get('/booking', [BookingController::class, 'create'])->name('booking');
     Route::get('/my-booking', [BookingController::class, 'myBooking'])->name('my-booking');
     Route::post('/booking', [BookingController::class, 'store'])->name('booking.store');
+    Route::get('/booking/payment/finish', [BookingController::class, 'midtransReturn'])->name('booking.paymentFinish');
+    Route::get('/booking/payment/unfinish', [BookingController::class, 'midtransReturn'])->name('booking.paymentUnfinish');
+    Route::get('/booking/payment/error', [BookingController::class, 'midtransReturn'])->name('booking.paymentError');
+    Route::get('/booking/{booking}/confirm-payment', [BookingController::class, 'legacyConfirmPaymentReturn'])->name('booking.confirmPaymentReturn');
+    Route::get('/booking/{booking}/payment/sync', [BookingController::class, 'legacyConfirmPaymentReturn'])->name('booking.paymentSyncReturn');
+    Route::post('/booking/{booking}/payment/sync', [BookingController::class, 'syncPaymentStatus'])->name('booking.paymentSync');
+    Route::post('/booking/{booking}/payment/sync-json', [BookingController::class, 'syncPaymentStatusJson'])->name('booking.paymentSyncJson');
     Route::patch('/booking/{booking}/cancel', [BookingController::class, 'cancel'])->name('booking.cancel');
     Route::get('/booking/barbers-by-branch/{branch}', [BookingController::class, 'barbersByBranch'])->name('booking.barbersByBranch');
+    Route::get('/booking/available-times', [BookingController::class, 'availableTimes'])->name('booking.availableTimes');
 });
 
 // Admin Routes

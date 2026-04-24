@@ -13,7 +13,7 @@
 
                 @if ($errors->any())
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <strong>Oops!</strong> There were errors with your submission.
+                        <strong>Oops!</strong> Terjadi kesalahan saat mendaftar. Silakan periksa kembali data yang Anda masukkan.
                         <ul class="mb-0 mt-2">
                             @foreach ($errors->all() as $error)
                                 <li>{{ $error }}</li>
@@ -55,7 +55,7 @@
                                id="password" name="password" 
                                placeholder="Enter password (min. 8 characters)" required>
                         <small class="text-muted d-block mt-2">
-                            <i class="fas fa-info-circle"></i> Password must be at least 8 characters long
+                            <i class="fas fa-info-circle"></i> Password harus terdiri dari minimal 8 karakter.
                         </small>
                         @error('password')
                             <div class="invalid-feedback d-block">{{ $message }}</div>
@@ -81,7 +81,7 @@
                     <!-- Login Link -->
                     <div class="text-center mt-4">
                         <p class="text-muted">
-                            Already have an account? 
+                            Sudah punya akun?
                             <a href="{{ route('login') }}" class="text-danger fw-bold text-decoration-none">
                                 Sign In
                             </a>

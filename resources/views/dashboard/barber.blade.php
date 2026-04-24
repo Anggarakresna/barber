@@ -105,10 +105,14 @@
                             <td>{{ \Carbon\Carbon::parse($booking->booking_date)->format('d M Y') }}</td>
                             <td>{{ \Carbon\Carbon::parse($booking->booking_time)->format('H:i') }}</td>
                             <td>
-                                @if($booking->status === 'pending')
+                                @if($booking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT)
+                                    <span class="badge bg-danger">Waiting Payment</span>
+                                @elseif($booking->status === 'pending')
                                     <span class="badge bg-warning text-dark">Pending</span>
                                 @elseif($booking->status === 'confirmed')
                                     <span class="badge bg-info">Confirmed</span>
+                                @elseif($booking->status === 'processing')
+                                    <span class="badge bg-primary">Processing</span>
                                 @elseif($booking->status === 'completed')
                                     <span class="badge bg-success">Completed</span>
                                 @elseif($booking->status === 'cancelled')
@@ -136,7 +140,7 @@
                                         @csrf @method('PATCH')
                                         <input type="hidden" name="status" value="completed">
                                         <button type="submit" class="btn btn-sm btn-outline-success">
-                                            <i class="fas fa-check-double"></i> Complete
+                                            <i class="fas fa-check-double"></i> Completed
                                         </button>
                                     </form>
                                 @else

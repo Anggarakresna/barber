@@ -13,7 +13,7 @@
 
                 @if ($errors->any())
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <strong>Login Failed!</strong> Please check your credentials.
+                        <strong>Login Gagal!</strong> .
                         @foreach ($errors->all() as $error)
                             <div>{{ $error }}</div>
                         @endforeach
@@ -72,9 +72,9 @@
                     <!-- Registration Link -->
                     <div class="text-center mt-4">
                         <p class="text-muted mb-3">
-                            Don't have an account? 
+                            Belum punya akun? 
                             <a href="{{ route('register') }}" class="text-danger fw-bold text-decoration-none">
-                                Create one
+                                Buat akun baru
                             </a>
                         </p>
                     </div>

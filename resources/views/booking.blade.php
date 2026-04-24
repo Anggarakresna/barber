@@ -12,6 +12,76 @@
 
 <div class="row justify-content-center">
     <div class="col-lg-8">
+        @if($activeBooking)
+            <div class="card border-0 shadow-sm border-start border-4 border-warning">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-3 text-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Booking Masih Berjalan
+                    </h5>
+                    @if($activeBooking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT)
+                        <p class="mb-4">
+                            Anda memiliki booking yang menunggu pembayaran DP. Silakan lanjutkan pembayaran di halaman My Booking.
+                        </p>
+                    @else
+                        <p class="mb-4">
+                            Anda masih memiliki booking yang sedang berjalan. Silakan tunggu hingga barber menyelesaikan booking Anda.
+                        </p>
+                    @endif
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="text-muted small">Service</div>
+                            <div class="fw-semibold">{{ $activeBooking->service->name ?? '-' }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted small">Barber</div>
+                            <div class="fw-semibold">{{ $activeBooking->barber->user->name ?? '-' }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted small">Cabang</div>
+                            <div class="fw-semibold">{{ $activeBooking->barber->branch->name ?? '-' }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted small">Tanggal & Jam</div>
+                            <div class="fw-semibold">
+                                {{ $activeBooking->booking_date->format('d M Y') }}
+                                {{ \Carbon\Carbon::parse($activeBooking->booking_time)->format('H:i') }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted small">Jumlah Orang</div>
+                            <div class="fw-semibold">{{ $activeBooking->total_people ?? 1 }} orang</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-muted small">Status</div>
+                            <div>
+                                @switch($activeBooking->status)
+                                    @case(\App\Models\Booking::STATUS_WAITING_PAYMENT)
+                                        <span class="badge bg-danger">Waiting Payment</span>
+                                        @break
+                                    @case('pending')
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                        @break
+                                    @case('confirmed')
+                                        <span class="badge bg-info">Confirmed</span>
+                                        @break
+                                    @case('processing')
+                                        <span class="badge bg-primary">Processing</span>
+                                        @break
+                                    @default
+                                        <span class="badge bg-secondary">{{ ucfirst($activeBooking->status) }}</span>
+                                @endswitch
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="{{ route('my-booking') }}" class="btn btn-outline-danger">
+                        <i class="fas fa-receipt"></i>
+                        {{ $activeBooking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT ? 'Lanjutkan Pembayaran' : 'Lihat My Booking' }}
+                    </a>
+                </div>
+            </div>
+        @else
         <form action="{{ route('booking.store') }}" method="POST" class="card border-0 shadow-sm p-4">
             @csrf
 
@@ -25,6 +95,21 @@
                     </ul>
                 </div>
             @endif
+
+            <!-- Service Selection -->
+            <div class="mb-4">
+                <label for="service_id" class="form-label fw-bold">
+                    <i class="fas fa-cut"></i> Pilih Layanan
+                </label>
+                <select class="form-select form-select-lg" id="service_id" name="service_id" required>
+                    <option value="">-- Pilih layanan --</option>
+                    @foreach($services as $service)
+                        <option value="{{ $service->id }}" {{ old('service_id') == $service->id ? 'selected' : '' }}>
+                            {{ $service->name }} - Rp {{ number_format($service->price, 0, ',', '.') }} ({{ $service->duration }} min)
+                        </option>
+                    @endforeach
+                </select>
+            </div>
 
             <!-- Branch Selection -->
             <div class="mb-4">
@@ -44,58 +129,50 @@
             <!-- Barber Selection -->
             <div class="mb-4">
                 <label for="barber_id" class="form-label fw-bold">
-                    <i class="fas fa-user"></i> Select Barber
+                    <i class="fas fa-user"></i> Pilih Barber
                 </label>
                 <select class="form-select form-select-lg" id="barber_id" name="barber_id" required disabled>
                     <option value="">-- Pilih cabang terlebih dahulu --</option>
                 </select>
             </div>
 
-            <!-- Service Selection -->
-            <div class="mb-4">
-                <label for="service_id" class="form-label fw-bold">
-                    <i class="fas fa-cut"></i> Select Service
-                </label>
-                <select class="form-select form-select-lg" id="service_id" name="service_id" required>
-                    <option value="">-- Pilih layanan --</option>
-                    @foreach($services as $service)
-                        <option value="{{ $service->id }}" {{ old('service_id') == $service->id ? 'selected' : '' }}>
-                            {{ $service->name }} - Rp {{ number_format($service->price, 0, ',', '.') }} ({{ $service->duration }} min)
-                        </option>
-                    @endforeach
-                </select>
-            </div>
 
             <!-- Date Selection -->
             <div class="row">
-                <div class="col-md-6 mb-4">
+                <div class="col-md-4 mb-4">
                     <label for="booking_date" class="form-label fw-bold">
-                        <i class="fas fa-calendar-alt"></i> Date
+                        <i class="fas fa-calendar-alt"></i> Tanggal
                     </label>
                     <input type="date" class="form-control form-control-lg" id="booking_date" 
-                           name="booking_date" required>
+                              name="booking_date" value="{{ old('booking_date') }}" min="{{ now('Asia/Jakarta')->toDateString() }}" required>
                 </div>
 
                 <!-- Time Selection -->
-                <div class="col-md-6 mb-4">
+                <div class="col-md-4 mb-4">
                     <label for="booking_time" class="form-label fw-bold">
-                        <i class="fas fa-clock"></i> Time
+                        <i class="fas fa-clock"></i> Waktu
                     </label>
-                    <select class="form-select form-select-lg" id="booking_time" name="booking_time" required>
-                        <option value="">-- Choose time --</option>
-                        <option value="09:00">09:00</option>
-                        <option value="10:00">10:00</option>
-                        <option value="11:00">11:00</option>
-                        <option value="12:00">12:00</option>
-                        <option value="13:00">13:00</option>
-                        <option value="14:00">14:00</option>
-                        <option value="15:00">15:00</option>
-                        <option value="16:00">16:00</option>
-                        <option value="17:00">17:00</option>
-                        <option value="18:00">18:00</option>
-                        <option value="19:00">19:00</option>
-                        <option value="20:00">20:00</option>
+                    <select class="form-select form-select-lg" id="booking_time" name="booking_time" required disabled>
+                        <option value="">-- Pilih barber dan tanggal dahulu --</option>
                     </select>
+                </div>
+
+                <!-- Total People -->
+                <div class="col-md-4 mb-4">
+                    <label for="total_people" class="form-label fw-bold">
+                        <i class="fas fa-users"></i> Jumlah Orang
+                    </label>
+                    <input
+                        type="number"
+                        class="form-control form-control-lg"
+                        id="total_people"
+                        name="total_people"
+                        min="1"
+                        max="5"
+                        value="{{ old('total_people', 1) }}"
+                        required
+                    >
+                    <small class="text-muted">Minimal 1 orang, maksimal 5 orang dalam satu booking.</small>
                 </div>
             </div>
 
@@ -104,20 +181,135 @@
                 <i class="fas fa-check-circle"></i> Confirm Booking
             </button>
         </form>
+        @endif
+    </div>
+</div>
 
 @endsection
 
 @section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+(function () {
+    const showToast = (icon, title) => {
+        if (!window.Swal) {
+            return;
+        }
+
+        window.Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon,
+            title,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+        });
+    };
+
+    @if(session('success'))
+        showToast('success', @json(session('success')));
+    @endif
+
+    @if(session('error'))
+        showToast('error', @json(session('error')));
+    @endif
+})();
+</script>
+
+@unless($activeBooking)
 <script>
 (function () {
     const branchSelect = document.getElementById('branch_id');
     const barberSelect = document.getElementById('barber_id');
+    const bookingDateInput = document.getElementById('booking_date');
+    const bookingTimeSelect = document.getElementById('booking_time');
+    const availableTimesUrl = "{{ route('booking.availableTimes') }}";
     const oldBarberId  = "{{ old('barber_id') }}";
+    const oldBookingTime = "{{ old('booking_time') }}";
+
+    const showToast = (icon, title) => {
+        if (!window.Swal) {
+            return;
+        }
+
+        window.Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon,
+            title,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+        });
+    };
+
+    const resetTimeOptions = (label = '-- Pilih barber dan tanggal dahulu --') => {
+        bookingTimeSelect.innerHTML = `<option value="">${label}</option>`;
+        bookingTimeSelect.disabled = true;
+    };
+
+    const renderTimeOptions = (timeSlots, emptyMessage = 'Slot tidak tersedia') => {
+        bookingTimeSelect.innerHTML = '<option value="">-- Pilih jam --</option>';
+
+        if (!timeSlots.length) {
+            bookingTimeSelect.innerHTML = `<option value="">${emptyMessage}</option>`;
+            bookingTimeSelect.disabled = true;
+            return;
+        }
+
+        timeSlots.forEach((time) => {
+            const option = document.createElement('option');
+            option.value = time;
+            option.textContent = time;
+            bookingTimeSelect.appendChild(option);
+        });
+
+        if (oldBookingTime && timeSlots.includes(oldBookingTime)) {
+            bookingTimeSelect.value = oldBookingTime;
+        }
+
+        bookingTimeSelect.disabled = false;
+    };
+
+    const loadAvailableTimes = async () => {
+        const barberId = barberSelect.value;
+        const bookingDate = bookingDateInput.value;
+
+        if (!barberId || !bookingDate) {
+            resetTimeOptions();
+            return;
+        }
+
+        bookingTimeSelect.innerHTML = '<option value="">-- Memuat slot... --</option>';
+        bookingTimeSelect.disabled = true;
+
+        try {
+            const url = `${availableTimesUrl}?barber_id=${encodeURIComponent(barberId)}&booking_date=${encodeURIComponent(bookingDate)}`;
+            const response = await fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+
+            if (!response.ok) {
+                throw new Error('failed');
+            }
+
+            const payload = await response.json();
+            const availableTimes = Array.isArray(payload.available_times) ? payload.available_times : [];
+            const noSlotMessage = payload.message || 'Slot tidak tersedia';
+
+            renderTimeOptions(availableTimes, noSlotMessage);
+        } catch (error) {
+            resetTimeOptions('-- Gagal memuat slot --');
+            showToast('error', 'Gagal memuat slot jadwal');
+        }
+    };
 
     branchSelect.addEventListener('change', function () {
         const branchId = this.value;
         barberSelect.innerHTML = '<option value="">-- Memuat barber... --</option>';
         barberSelect.disabled = true;
+        resetTimeOptions();
 
         if (!branchId) {
             barberSelect.innerHTML = '<option value="">-- Pilih cabang terlebih dahulu --</option>';
@@ -141,6 +333,10 @@
                     barberSelect.appendChild(opt);
                 });
                 barberSelect.disabled = false;
+
+                if (barberSelect.value && bookingDateInput.value) {
+                    loadAvailableTimes();
+                }
             }
         })
         .catch(() => {
@@ -148,10 +344,16 @@
         });
     });
 
+    barberSelect.addEventListener('change', loadAvailableTimes);
+    bookingDateInput.addEventListener('change', loadAvailableTimes);
+
     // Restore branch/barber on validation error
     if (branchSelect.value) {
         branchSelect.dispatchEvent(new Event('change'));
+    } else {
+        resetTimeOptions();
     }
 })();
 </script>
+@endunless
 @endsection
