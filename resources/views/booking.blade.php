@@ -214,6 +214,10 @@
     @if(session('error'))
         showToast('error', @json(session('error')));
     @endif
+
+    @if($errors->any())
+        showToast('error', @json($errors->first()));
+    @endif
 })();
 </script>
 
@@ -225,6 +229,7 @@
     const bookingDateInput = document.getElementById('booking_date');
     const bookingTimeSelect = document.getElementById('booking_time');
     const availableTimesUrl = "{{ route('booking.availableTimes') }}";
+    const barbersByBranchBaseUrl = @json(url('/booking/barbers-by-branch'));
     const oldBarberId  = "{{ old('barber_id') }}";
     const oldBookingTime = "{{ old('booking_time') }}";
 
@@ -316,7 +321,7 @@
             return;
         }
 
-        fetch(`/booking/barbers-by-branch/${branchId}`, {
+        fetch(`${barbersByBranchBaseUrl}/${branchId}`, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(res => res.json())

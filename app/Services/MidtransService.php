@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Booking;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 use Midtrans\Config as MidtransConfig;
 use Midtrans\Snap;
 use Midtrans\Transaction;
@@ -49,6 +50,7 @@ class MidtransService
         }
 
         $booking->loadMissing(['user', 'service']);
+        $phone = $booking->user?->getAttribute('phone');
 
         $orderId = $this->generateOrderId($booking);
         $startTime = Carbon::now('Asia/Jakarta');
@@ -61,7 +63,7 @@ class MidtransService
             'customer_details' => [
                 'first_name' => $booking->user->name,
                 'email' => $booking->user->email,
-                'phone' => $booking->user->phone ?? null,
+                'phone' => is_string($phone) && $phone !== '' ? $phone : null,
             ],
             'item_details' => [[
                 'id' => 'DP-BOOKING-' . $booking->id,
@@ -81,7 +83,17 @@ class MidtransService
             ],
         ];
 
-        $transaction = Snap::createTransaction($params);
+        try {
+            $transaction = Snap::createTransaction($params);
+        } catch (\Throwable $exception) {
+            Log::error('Gagal membuat transaksi Snap Midtrans.', [
+                'booking_id' => $booking->id,
+                'exception' => $exception->getMessage(),
+            ]);
+
+            throw new RuntimeException('Gagal membuat transaksi pembayaran Midtrans.', previous: $exception);
+        }
+
         $snapToken = $transaction->token ?? null;
 
         if (empty($snapToken)) {

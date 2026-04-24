@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\Rule;
 
 class BookingController extends Controller
@@ -103,6 +104,11 @@ class BookingController extends Controller
      */
     public function store(Request $request)
     {
+        if (!Auth::check()) {
+            return redirect()->route('login')
+                ->with('error', 'Silakan login terlebih dahulu untuk melakukan booking.');
+        }
+
         $this->expireExpiredWaitingPaymentBookingsForAuthenticatedUser();
 
         if ($this->hasActiveBookingForAuthenticatedUser()) {
@@ -115,7 +121,7 @@ class BookingController extends Controller
                 ->with('error', $errorMessage);
         }
 
-        $validated = $request->validate([
+        $validator = validator($request->all(), [
             'branch_id' => ['required', 'exists:branches,id'],
             'barber_id' => ['required', 'exists:barbers,id'],
             'service_id' => ['required', 'exists:services,id'],
@@ -130,7 +136,31 @@ class BookingController extends Controller
             ],
             'booking_time' => ['required', 'date_format:H:i', Rule::in($this->generateTimeSlots())],
             'total_people' => ['required', 'integer', 'min:1', 'max:5'],
+        ], [
+            'branch_id.required' => 'Silakan pilih cabang terlebih dahulu.',
+            'branch_id.exists' => 'Cabang yang dipilih tidak valid.',
+            'barber_id.required' => 'Silakan pilih barber terlebih dahulu.',
+            'barber_id.exists' => 'Barber yang dipilih tidak valid.',
+            'service_id.required' => 'Silakan pilih layanan terlebih dahulu.',
+            'service_id.exists' => 'Layanan yang dipilih tidak valid.',
+            'booking_date.required' => 'Silakan pilih tanggal booking.',
+            'booking_date.date' => 'Format tanggal booking tidak valid.',
+            'booking_time.required' => 'Silakan pilih jam booking.',
+            'booking_time.date_format' => 'Format jam booking tidak valid.',
+            'total_people.required' => 'Silakan isi jumlah orang.',
+            'total_people.integer' => 'Jumlah orang harus berupa angka.',
+            'total_people.min' => 'Jumlah orang minimal 1.',
+            'total_people.max' => 'Jumlah orang maksimal 5.',
         ]);
+
+        if ($validator->fails()) {
+            return back()
+                ->withErrors($validator)
+                ->with('error', 'Silakan lengkapi data booking dengan benar.')
+                ->withInput();
+        }
+
+        $validated = $validator->validated();
 
         $operationalSlots = $this->getOperationalTimeSlotsForDate($validated['booking_date']);
         if (!in_array($validated['booking_time'], $operationalSlots, true)) {
@@ -178,42 +208,66 @@ class BookingController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($validated) {
-                $booking = Booking::create([
-                    'user_id' => Auth::id(),
-                    'barber_id' => $validated['barber_id'],
-                    'service_id' => $validated['service_id'],
-                    'booking_date' => $validated['booking_date'],
-                    'booking_time' => $validated['booking_time'],
-                    'total_people' => $validated['total_people'],
-                    'status' => Booking::STATUS_WAITING_PAYMENT,
-                    'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
-                    'dp_amount' => self::DP_AMOUNT,
-                ]);
+            $booking = DB::transaction(function () use ($validated) {
+                $shouldUseMidtrans = $this->canCreateWaitingPaymentBooking();
+                $bookingPayload = $this->buildBookingCreatePayload($validated, $shouldUseMidtrans);
+                $booking = Booking::create($bookingPayload);
+
+                if (!$shouldUseMidtrans) {
+                    Log::warning('Booking dibuat tanpa Midtrans karena schema/konfigurasi belum siap.', [
+                        'booking_id' => $booking->id,
+                        'user_id' => Auth::id(),
+                        'missing_columns' => $this->getMissingBookingColumnsForPayment(),
+                        'midtrans_ready' => $this->hasMidtransConfiguration(),
+                    ]);
+
+                    return $booking;
+                }
 
                 $midtransService = app(MidtransService::class);
                 $transaction = $midtransService->createDpTransaction($booking, self::PAYMENT_WINDOW_MINUTES);
 
-                $booking->update([
-                    'midtrans_order_id' => $transaction['order_id'],
-                    'midtrans_snap_token' => $transaction['snap_token'],
-                    'payment_expired_at' => $transaction['payment_expired_at'],
-                    'payment_deadline' => $transaction['payment_expired_at'],
-                ]);
+                $booking->update($this->buildBookingPaymentUpdatePayload($transaction));
+
+                return $booking;
             });
+        } catch (QueryException $exception) {
+            Log::error('Gagal menyimpan booking.', [
+                'user_id' => Auth::id(),
+                'exception' => $exception->getMessage(),
+            ]);
+
+            $message = $this->isDuplicateBookingSlotException($exception)
+                ? 'Jadwal sudah terisi. Silakan pilih jam lain.'
+                : 'Terjadi kesalahan saat menyimpan booking. Periksa kembali data booking Anda.';
+
+            return back()
+                ->withErrors(['booking' => $message])
+                ->with('error', $message)
+                ->withInput();
         } catch (\Throwable $exception) {
             Log::error('Gagal membuat transaksi Midtrans saat booking.', [
                 'user_id' => Auth::id(),
                 'exception' => $exception->getMessage(),
             ]);
 
+            $message = str_contains(strtolower($exception->getMessage()), 'midtrans')
+                ? 'Terjadi kesalahan saat membuat transaksi pembayaran.'
+                : 'Terjadi kesalahan saat memproses booking. Coba lagi dalam beberapa saat.';
+
             return back()
-                ->withErrors(['booking' => 'Booking gagal diproses karena transaksi pembayaran tidak dapat dibuat. Coba lagi dalam beberapa saat.'])
-                ->with('error', 'Booking gagal diproses karena transaksi pembayaran tidak dapat dibuat. Coba lagi dalam beberapa saat.')
+                ->withErrors(['booking' => $message])
+                ->with('error', $message)
                 ->withInput();
         }
 
-        return redirect()->route('my-booking')->with('success', 'Booking berhasil dibuat. Silakan selesaikan pembayaran DP dalam 30 menit.');
+        if ($this->canCreateWaitingPaymentBooking()) {
+            return redirect()->route('my-booking')
+                ->with('success', 'Booking berhasil dibuat. Silakan selesaikan pembayaran DP dalam 30 menit.');
+        }
+
+        return redirect()->route('my-booking')
+            ->with('success', 'Booking berhasil dibuat.');
     }
 
     /**
@@ -320,6 +374,89 @@ class BookingController extends Controller
         return response()->json([
             'state' => 'pending',
             'message' => 'Status pembayaran masih menunggu.',
+        ]);
+    }
+
+    /**
+     * Complete payment flow from Snap JavaScript callback and update booking immediately.
+     */
+    public function completePaymentFromSnap(Request $request, Booking $booking)
+    {
+        if ($booking->user_id !== Auth::id()) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        $validated = $request->validate([
+            'order_id' => ['nullable', 'string'],
+            'transaction_status' => ['nullable', 'string'],
+            'fraud_status' => ['nullable', 'string'],
+            'status_code' => ['nullable'],
+            'payment_type' => ['nullable', 'string'],
+            'gross_amount' => ['nullable'],
+        ]);
+
+        $this->expireExpiredWaitingPaymentBookingsForAuthenticatedUser();
+        $booking->refresh();
+
+        if (
+            !empty($validated['order_id'])
+            && !empty($booking->midtrans_order_id)
+            && $validated['order_id'] !== $booking->midtrans_order_id
+        ) {
+            return response()->json([
+                'state' => 'error',
+                'message' => 'Order Midtrans tidak sesuai dengan booking ini.',
+            ], 422);
+        }
+
+        if ($booking->payment_status === Booking::PAYMENT_STATUS_PAID || $booking->status === Booking::STATUS_CONFIRMED) {
+            return response()->json([
+                'state' => 'paid',
+                'message' => 'Pembayaran berhasil. Booking Anda sudah dikonfirmasi.',
+                'redirect_url' => route('my-booking'),
+            ]);
+        }
+
+        if ($booking->payment_status === Booking::PAYMENT_STATUS_EXPIRED || $booking->status === Booking::STATUS_CANCELLED) {
+            return response()->json([
+                'state' => 'cancelled',
+                'message' => 'Booking dibatalkan karena pembayaran tidak berhasil atau melewati batas waktu.',
+                'redirect_url' => route('my-booking'),
+            ]);
+        }
+
+        if (!empty($validated['transaction_status'])) {
+            $this->applyMidtransStatusToBooking($booking, $validated);
+            $booking->refresh();
+        } elseif (!empty($booking->midtrans_order_id)) {
+            try {
+                $response = app(MidtransService::class)->getTransactionStatus($booking->midtrans_order_id);
+                $this->applyMidtransStatusToBooking($booking, $response);
+                $booking->refresh();
+            } catch (\Throwable $exception) {
+                Log::warning('Gagal menyelesaikan pembayaran dari callback Snap.', [
+                    'booking_id' => $booking->id,
+                    'order_id' => $booking->midtrans_order_id,
+                    'exception' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $state = 'pending';
+        $message = 'Status pembayaran masih menunggu.';
+
+        if ($booking->payment_status === Booking::PAYMENT_STATUS_PAID || $booking->status === Booking::STATUS_CONFIRMED) {
+            $state = 'paid';
+            $message = 'Pembayaran berhasil. Booking Anda sudah dikonfirmasi.';
+        } elseif ($booking->payment_status === Booking::PAYMENT_STATUS_EXPIRED || $booking->status === Booking::STATUS_CANCELLED) {
+            $state = 'cancelled';
+            $message = 'Booking dibatalkan karena pembayaran tidak berhasil atau melewati batas waktu.';
+        }
+
+        return response()->json([
+            'state' => $state,
+            'message' => $message,
+            'redirect_url' => route('my-booking'),
         ]);
     }
 
@@ -522,7 +659,11 @@ class BookingController extends Controller
         }
 
         if (in_array($transactionStatus, ['cancel', 'deny', 'expire', 'failure'], true)) {
-            $this->markBookingAsExpired($booking);
+            $paymentStatus = $transactionStatus === 'expire'
+                ? Booking::PAYMENT_STATUS_EXPIRED
+                : Booking::PAYMENT_STATUS_CANCELLED;
+
+            $this->markBookingAsCancelled($booking, $paymentStatus);
         }
     }
 
@@ -531,9 +672,17 @@ class BookingController extends Controller
      */
     private function markBookingAsExpired(Booking $booking): void
     {
+        $this->markBookingAsCancelled($booking, Booking::PAYMENT_STATUS_EXPIRED);
+    }
+
+    /**
+     * Mark waiting payment booking as cancelled and store payment status detail.
+     */
+    private function markBookingAsCancelled(Booking $booking, string $paymentStatus): void
+    {
         $booking->update([
             'status' => Booking::STATUS_CANCELLED,
-            'payment_status' => Booking::PAYMENT_STATUS_EXPIRED,
+            'payment_status' => $paymentStatus,
         ]);
     }
 
@@ -577,15 +726,29 @@ class BookingController extends Controller
             ? 'Booking dibatalkan karena pembayaran melewati batas waktu.'
             : null;
 
-        $waitingPaymentBooking = Booking::with(['service', 'barber.user'])
-            ->where('user_id', Auth::id())
-            ->where('status', Booking::STATUS_WAITING_PAYMENT)
-            ->where(function ($query) {
-                $query->whereNull('payment_status')
-                    ->orWhere('payment_status', Booking::PAYMENT_STATUS_UNPAID);
-            })
-            ->orderByDesc('created_at')
-            ->first();
+        $waitingPaymentBooking = null;
+
+        if ($this->hasBookingColumns(['payment_status'])) {
+            $waitingPaymentBooking = Booking::with(['service', 'barber.user'])
+                ->where('user_id', Auth::id())
+                ->where('status', Booking::STATUS_WAITING_PAYMENT)
+                ->where(function ($query) {
+                    $query->whereNull('payment_status')
+                        ->orWhere('payment_status', Booking::PAYMENT_STATUS_UNPAID);
+                })
+                ->orderByDesc('created_at')
+                ->first();
+        }
+
+        if (
+            $waitingPaymentBooking
+            && (
+                $waitingPaymentBooking->status !== Booking::STATUS_WAITING_PAYMENT
+                || $waitingPaymentBooking->payment_status !== Booking::PAYMENT_STATUS_UNPAID
+            )
+        ) {
+            $waitingPaymentBooking = null;
+        }
 
         if ($waitingPaymentBooking && empty($waitingPaymentBooking->midtrans_snap_token)) {
             try {
@@ -801,5 +964,124 @@ class BookingController extends Controller
             'payment_status' => Booking::PAYMENT_STATUS_EXPIRED,
             'updated_at' => now(),
         ]);
+    }
+
+    /**
+     * Check whether current schema and config support waiting-payment Midtrans flow.
+     */
+    private function canCreateWaitingPaymentBooking(): bool
+    {
+        return $this->hasMidtransConfiguration() && empty($this->getMissingBookingColumnsForPayment());
+    }
+
+    /**
+     * Build booking payload while remaining compatible with older schemas.
+     */
+    private function buildBookingCreatePayload(array $validated, bool $withMidtrans): array
+    {
+        $payload = [
+            'user_id' => Auth::id(),
+            'barber_id' => $validated['barber_id'],
+            'service_id' => $validated['service_id'],
+            'booking_date' => $validated['booking_date'],
+            'booking_time' => $validated['booking_time'],
+            'status' => $withMidtrans ? Booking::STATUS_WAITING_PAYMENT : Booking::STATUS_PENDING,
+        ];
+
+        if ($this->hasBookingColumns(['total_people'])) {
+            $payload['total_people'] = $validated['total_people'];
+        }
+
+        if ($this->hasBookingColumns(['payment_status'])) {
+            $payload['payment_status'] = $withMidtrans
+                ? Booking::PAYMENT_STATUS_UNPAID
+                : Booking::PAYMENT_STATUS_UNPAID;
+        }
+
+        if ($withMidtrans && $this->hasBookingColumns(['dp_amount'])) {
+            $payload['dp_amount'] = self::DP_AMOUNT;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Build booking payment update payload for columns that exist in the database.
+     */
+    private function buildBookingPaymentUpdatePayload(array $transaction): array
+    {
+        $payload = [];
+
+        if ($this->hasBookingColumns(['midtrans_order_id'])) {
+            $payload['midtrans_order_id'] = $transaction['order_id'];
+        }
+
+        if ($this->hasBookingColumns(['midtrans_snap_token'])) {
+            $payload['midtrans_snap_token'] = $transaction['snap_token'];
+        }
+
+        if ($this->hasBookingColumns(['payment_expired_at'])) {
+            $payload['payment_expired_at'] = $transaction['payment_expired_at'];
+        }
+
+        if ($this->hasBookingColumns(['payment_deadline'])) {
+            $payload['payment_deadline'] = $transaction['payment_expired_at'];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Determine whether bookings table contains all provided columns.
+     */
+    private function hasBookingColumns(array $columns): bool
+    {
+        foreach ($columns as $column) {
+            if (!Schema::hasColumn('bookings', $column)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Return payment-related booking columns that are still missing.
+     *
+     * @return array<int, string>
+     */
+    private function getMissingBookingColumnsForPayment(): array
+    {
+        $requiredColumns = [
+            'payment_status',
+            'midtrans_order_id',
+            'midtrans_snap_token',
+            'payment_expired_at',
+            'payment_deadline',
+            'dp_amount',
+            'total_people',
+        ];
+
+        return array_values(array_filter($requiredColumns, fn ($column) => !Schema::hasColumn('bookings', $column)));
+    }
+
+    /**
+     * Check whether Midtrans credentials are available.
+     */
+    private function hasMidtransConfiguration(): bool
+    {
+        return filled(config('services.midtrans.server_key')) && filled(config('services.midtrans.client_key'));
+    }
+
+    /**
+     * Detect duplicate-slot database exceptions and convert them into friendly messages.
+     */
+    private function isDuplicateBookingSlotException(QueryException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'duplicate entry')
+            || str_contains($message, 'unique constraint')
+            || str_contains($message, 'bookings_barber_id_booking_date_booking_time_unique');
     }
 }

@@ -16,7 +16,7 @@
     </div>
 @endif
 
-@if($waitingPaymentBooking)
+@if($waitingPaymentBooking && $waitingPaymentBooking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT && $waitingPaymentBooking->payment_status === \App\Models\Booking::PAYMENT_STATUS_UNPAID)
     @php
         $paymentExpiredAt = $waitingPaymentBooking->payment_expired_at ?? $waitingPaymentBooking->payment_deadline;
     @endphp
@@ -169,9 +169,17 @@
                                         @default
                                             <span class="badge bg-secondary">{{ ucfirst($booking->status) }}</span>
                                     @endswitch
+
+                                    @if($booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_PAID)
+                                        <span class="badge bg-primary ms-1">Paid</span>
+                                    @elseif($booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_UNPAID && $booking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT)
+                                        <span class="badge bg-light text-dark ms-1">Unpaid</span>
+                                    @elseif(in_array($booking->payment_status, [\App\Models\Booking::PAYMENT_STATUS_EXPIRED, \App\Models\Booking::PAYMENT_STATUS_CANCELLED], true))
+                                        <span class="badge bg-secondary ms-1">{{ ucfirst($booking->payment_status) }}</span>
+                                    @endif
                                 </td>
                                 <td>
-                                    @if($booking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT)
+                                    @if($booking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT && $booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_UNPAID)
                                         <span class="text-muted small">Gunakan panel pembayaran</span>
                                     @elseif(in_array($booking->status, ['pending', 'confirmed']))
                                         <form action="{{ route('booking.cancel', $booking) }}" method="POST"
@@ -239,6 +247,8 @@
     const payDpButton = document.getElementById('pay-dp-button');
     const syncPaymentForm = document.getElementById('sync-payment-form');
     const syncPaymentJsonUrl = @json($waitingPaymentBooking ? route('booking.paymentSyncJson', $waitingPaymentBooking) : null);
+    const completePaymentUrl = @json($waitingPaymentBooking ? route('booking.paymentComplete', $waitingPaymentBooking) : null);
+    const myBookingsUrl = @json(route('my-booking'));
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     const syncPaymentStatus = () => {
@@ -272,38 +282,31 @@
         return response.json();
     };
 
-    const wait = (milliseconds) => new Promise((resolve) => {
-        window.setTimeout(resolve, milliseconds);
-    });
-
-    const pollPaymentAfterSuccess = async () => {
-        const maxAttempts = 8;
-
-        showToast('info', 'Memverifikasi pembayaran...');
-
-        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-            try {
-                const result = await syncPaymentStatusJson();
-
-                if (result && result.state === 'paid') {
-                    window.location.reload();
-                    return;
-                }
-
-                if (result && result.state === 'cancelled') {
-                    window.location.reload();
-                    return;
-                }
-            } catch (error) {
-                if (attempt === maxAttempts) {
-                    break;
-                }
-            }
-
-            await wait(2500);
+    const completePaymentFromSnap = async (payload) => {
+        if (!completePaymentUrl || !csrfToken) {
+            return null;
         }
 
-        syncPaymentStatus();
+        const response = await fetch(completePaymentUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify(payload || {}),
+        });
+
+        if (!response.ok) {
+            throw new Error('complete-failed');
+        }
+
+        return response.json();
+    };
+
+    const redirectToMyBookings = () => {
+        window.location.href = myBookingsUrl || '/my-bookings';
     };
 
     if (payDpButton) {
@@ -321,16 +324,56 @@
             }
 
             window.snap.pay(snapToken, {
-                onSuccess: function () {
+                onSuccess: async function (result) {
                     payDpButton.disabled = true;
                     payDpButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memverifikasi...';
-                    pollPaymentAfterSuccess();
+
+                    try {
+                        const completion = await completePaymentFromSnap(result);
+
+                        if (completion && completion.state === 'paid') {
+                            redirectToMyBookings();
+                            return;
+                        }
+                    } catch (error) {
+                        // Fallback to payment sync below.
+                    }
+
+                    try {
+                        const syncResult = await syncPaymentStatusJson();
+
+                        if (syncResult && (syncResult.state === 'paid' || syncResult.state === 'updated')) {
+                            redirectToMyBookings();
+                            return;
+                        }
+                    } catch (error) {
+                        // Continue to redirect so customer returns to My Booking page.
+                    }
+
+                    redirectToMyBookings();
                 },
-                onPending: function () {
-                    syncPaymentStatus();
+                onPending: async function () {
+                    try {
+                        await syncPaymentStatusJson();
+                    } catch (error) {
+                        // Keep pending flow on page even if sync temporarily fails.
+                    }
+
+                    showToast('info', 'Pembayaran masih pending. Silakan selesaikan pembayaran sebelum batas waktu habis.');
                 },
-                onError: function () {
-                    syncPaymentStatus();
+                onError: async function () {
+                    try {
+                        const result = await syncPaymentStatusJson();
+
+                        if (result && result.state === 'cancelled') {
+                            redirectToMyBookings();
+                            return;
+                        }
+                    } catch (error) {
+                        // Keep current page and show error toast below.
+                    }
+
+                    showToast('error', 'Pembayaran gagal diproses. Silakan coba lagi atau cek status pembayaran.');
                 },
                 onClose: function () {
                     showToast('info', 'Popup pembayaran ditutup. Anda bisa lanjutkan kapan saja sebelum waktu habis.');

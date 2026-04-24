@@ -35,7 +35,8 @@ Route::middleware('auth.check')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [AuthController::class, 'dashboard'])->name('dashboard');
     Route::get('/booking', [BookingController::class, 'create'])->name('booking');
-    Route::get('/my-booking', [BookingController::class, 'myBooking'])->name('my-booking');
+    Route::get('/my-bookings', [BookingController::class, 'myBooking'])->name('my-booking');
+    Route::get('/my-booking', [BookingController::class, 'myBooking']);
     Route::post('/booking', [BookingController::class, 'store'])->name('booking.store');
     Route::get('/booking/payment/finish', [BookingController::class, 'midtransReturn'])->name('booking.paymentFinish');
     Route::get('/booking/payment/unfinish', [BookingController::class, 'midtransReturn'])->name('booking.paymentUnfinish');
@@ -44,6 +45,7 @@ Route::middleware('auth.check')->group(function () {
     Route::get('/booking/{booking}/payment/sync', [BookingController::class, 'legacyConfirmPaymentReturn'])->name('booking.paymentSyncReturn');
     Route::post('/booking/{booking}/payment/sync', [BookingController::class, 'syncPaymentStatus'])->name('booking.paymentSync');
     Route::post('/booking/{booking}/payment/sync-json', [BookingController::class, 'syncPaymentStatusJson'])->name('booking.paymentSyncJson');
+    Route::post('/booking/{booking}/payment/complete', [BookingController::class, 'completePaymentFromSnap'])->name('booking.paymentComplete');
     Route::patch('/booking/{booking}/cancel', [BookingController::class, 'cancel'])->name('booking.cancel');
     Route::get('/booking/barbers-by-branch/{branch}', [BookingController::class, 'barbersByBranch'])->name('booking.barbersByBranch');
     Route::get('/booking/available-times', [BookingController::class, 'availableTimes'])->name('booking.availableTimes');
