@@ -54,8 +54,8 @@ class PaymentController extends Controller
 
         $bookings = Booking::with(['service', 'barber.user'])
             ->where('user_id', Auth::id())
-            ->orderByDesc('booking_date')
-            ->orderByDesc('booking_time')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate(5);
 
         return view('my-booking', compact('bookings', 'waitingPaymentBooking', 'paymentExpiredMessage'));
