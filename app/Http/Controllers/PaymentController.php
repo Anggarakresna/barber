@@ -609,7 +609,8 @@ class PaymentController extends Controller
      */
     private function hasMidtransConfiguration(): bool
     {
-        return filled(config('services.midtrans.server_key')) && filled(config('services.midtrans.client_key'));
+        return filled(config('midtrans.server_key', config('services.midtrans.server_key')))
+            && filled(config('midtrans.client_key', config('services.midtrans.client_key')));
     }
 
     /**

@@ -19,19 +19,19 @@ class MidtransService
     }
 
     /**
-     * Configure Midtrans SDK from config/services.php.
+     * Configure Midtrans SDK from config/midtrans.php.
      */
     private function configure(): void
     {
-        MidtransConfig::$serverKey = (string) config('services.midtrans.server_key');
-        MidtransConfig::$isProduction = (bool) config('services.midtrans.is_production', false);
-        MidtransConfig::$isSanitized = (bool) config('services.midtrans.is_sanitized', true);
-        MidtransConfig::$is3ds = (bool) config('services.midtrans.is_3ds', true);
+        MidtransConfig::$serverKey = (string) config('midtrans.server_key', config('services.midtrans.server_key'));
+        MidtransConfig::$isProduction = (bool) config('midtrans.is_production', config('services.midtrans.is_production', false));
+        MidtransConfig::$isSanitized = (bool) config('midtrans.is_sanitized', config('services.midtrans.is_sanitized', true));
+        MidtransConfig::$is3ds = (bool) config('midtrans.is_3ds', config('services.midtrans.is_3ds', true));
     }
 
     private function buildCallbackUrl(string $path): string
     {
-        $publicUrl = trim((string) config('services.midtrans.public_url'));
+        $publicUrl = trim((string) config('midtrans.public_url', config('services.midtrans.public_url')));
 
         if ($publicUrl !== '') {
             return rtrim($publicUrl, '/') . '/' . ltrim($path, '/');
@@ -45,7 +45,7 @@ class MidtransService
      */
     public function createDpTransaction(Booking $booking, int $paymentWindowMinutes = 30): array
     {
-        if (empty(config('services.midtrans.server_key')) || empty(config('services.midtrans.client_key'))) {
+        if (empty(config('midtrans.server_key', config('services.midtrans.server_key'))) || empty(config('midtrans.client_key', config('services.midtrans.client_key')))) {
             throw new RuntimeException('MIDTRANS_SERVER_KEY dan MIDTRANS_CLIENT_KEY harus diisi.');
         }
 
@@ -84,17 +84,16 @@ class MidtransService
         ];
 
         try {
-            $transaction = Snap::createTransaction($params);
+            $snapToken = Snap::getSnapToken($params);
         } catch (\Throwable $exception) {
             Log::error('Gagal membuat transaksi Snap Midtrans.', [
                 'booking_id' => $booking->id,
+                'params' => $params,
                 'exception' => $exception->getMessage(),
             ]);
 
             throw new RuntimeException('Gagal membuat transaksi pembayaran Midtrans.', previous: $exception);
         }
-
-        $snapToken = $transaction->token ?? null;
 
         if (empty($snapToken)) {
             throw new RuntimeException('Gagal mendapatkan Snap token dari Midtrans.');
@@ -126,7 +125,7 @@ class MidtransService
         $statusCode = (string) ($payload['status_code'] ?? '');
         $grossAmount = (string) ($payload['gross_amount'] ?? '');
         $signatureKey = (string) ($payload['signature_key'] ?? '');
-        $serverKey = (string) config('services.midtrans.server_key');
+        $serverKey = (string) config('midtrans.server_key', config('services.midtrans.server_key'));
 
         if ($orderId === '' || $statusCode === '' || $grossAmount === '' || $signatureKey === '' || $serverKey === '') {
             return false;

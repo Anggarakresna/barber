@@ -211,10 +211,10 @@
 
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-@if(config('services.midtrans.client_key'))
+@if(config('midtrans.clientKey') || config('midtrans.client_key') || config('services.midtrans.client_key'))
     <script
-        src="{{ config('services.midtrans.is_production') ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
-        data-client-key="{{ config('services.midtrans.client_key') }}"
+        src="{{ config('midtrans.isProduction', config('midtrans.is_production', config('services.midtrans.is_production'))) ? 'https://app.midtrans.com/snap/snap.js' : 'https://app.sandbox.midtrans.com/snap/snap.js' }}"
+        data-client-key="{{ config('midtrans.clientKey', config('midtrans.client_key', config('services.midtrans.client_key'))) }}"
     ></script>
 @endif
 <script>
@@ -249,6 +249,7 @@
     const syncPaymentJsonUrl = @json($waitingPaymentBooking ? route('booking.paymentSyncJson', $waitingPaymentBooking) : null);
     const completePaymentUrl = @json($waitingPaymentBooking ? route('booking.paymentComplete', $waitingPaymentBooking) : null);
     const myBookingsUrl = @json(route('my-booking'));
+    const shouldAutoOpenSnap = @json((bool) session('open_midtrans_on_load'));
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     const syncPaymentStatus = () => {
@@ -309,77 +310,87 @@
         window.location.href = myBookingsUrl || '/my-bookings';
     };
 
-    if (payDpButton) {
-        payDpButton.addEventListener('click', () => {
-            const snapToken = payDpButton.dataset.snapToken;
+    const openSnapPayment = () => {
+        if (!payDpButton) {
+            return;
+        }
 
-            if (!snapToken) {
-                showToast('error', 'Snap token Midtrans belum tersedia. Silakan klik Cek Status atau refresh halaman.');
-                return;
-            }
+        const snapToken = payDpButton.dataset.snapToken;
 
-            if (!window.snap || typeof window.snap.pay !== 'function') {
-                showToast('error', 'Midtrans Snap belum termuat. Periksa MIDTRANS_CLIENT_KEY Anda.');
-                return;
-            }
+        if (!snapToken) {
+            showToast('error', 'Snap token Midtrans belum tersedia. Silakan klik Cek Status atau refresh halaman.');
+            return;
+        }
 
-            window.snap.pay(snapToken, {
-                onSuccess: async function (result) {
-                    payDpButton.disabled = true;
-                    payDpButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memverifikasi...';
+        if (!window.snap || typeof window.snap.pay !== 'function') {
+            showToast('error', 'Midtrans Snap belum termuat. Periksa MIDTRANS_CLIENT_KEY Anda.');
+            return;
+        }
 
-                    try {
-                        const completion = await completePaymentFromSnap(result);
+        window.snap.pay(snapToken, {
+            onSuccess: async function (result) {
+                payDpButton.disabled = true;
+                payDpButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memverifikasi...';
 
-                        if (completion && completion.state === 'paid') {
-                            redirectToMyBookings();
-                            return;
-                        }
-                    } catch (error) {
-                        // Fallback to payment sync below.
+                try {
+                    const completion = await completePaymentFromSnap(result);
+
+                    if (completion && completion.state === 'paid') {
+                        redirectToMyBookings();
+                        return;
                     }
-
-                    try {
-                        const syncResult = await syncPaymentStatusJson();
-
-                        if (syncResult && (syncResult.state === 'paid' || syncResult.state === 'updated')) {
-                            redirectToMyBookings();
-                            return;
-                        }
-                    } catch (error) {
-                        // Continue to redirect so customer returns to My Booking page.
-                    }
-
-                    redirectToMyBookings();
-                },
-                onPending: async function () {
-                    try {
-                        await syncPaymentStatusJson();
-                    } catch (error) {
-                        // Keep pending flow on page even if sync temporarily fails.
-                    }
-
-                    showToast('info', 'Pembayaran masih pending. Silakan selesaikan pembayaran sebelum batas waktu habis.');
-                },
-                onError: async function () {
-                    try {
-                        const result = await syncPaymentStatusJson();
-
-                        if (result && result.state === 'cancelled') {
-                            redirectToMyBookings();
-                            return;
-                        }
-                    } catch (error) {
-                        // Keep current page and show error toast below.
-                    }
-
-                    showToast('error', 'Pembayaran gagal diproses. Silakan coba lagi atau cek status pembayaran.');
-                },
-                onClose: function () {
-                    showToast('info', 'Popup pembayaran ditutup. Anda bisa lanjutkan kapan saja sebelum waktu habis.');
+                } catch (error) {
+                    // Fallback to payment sync below.
                 }
-            });
+
+                try {
+                    const syncResult = await syncPaymentStatusJson();
+
+                    if (syncResult && (syncResult.state === 'paid' || syncResult.state === 'updated')) {
+                        redirectToMyBookings();
+                        return;
+                    }
+                } catch (error) {
+                    // Continue to redirect so customer returns to My Booking page.
+                }
+
+                redirectToMyBookings();
+            },
+            onPending: async function () {
+                try {
+                    await syncPaymentStatusJson();
+                } catch (error) {
+                    // Keep pending flow on page even if sync temporarily fails.
+                }
+
+                showToast('info', 'Pembayaran masih pending. Silakan selesaikan pembayaran sebelum batas waktu habis.');
+            },
+            onError: async function () {
+                try {
+                    const result = await syncPaymentStatusJson();
+
+                    if (result && result.state === 'cancelled') {
+                        redirectToMyBookings();
+                        return;
+                    }
+                } catch (error) {
+                    // Keep current page and show error toast below.
+                }
+
+                showToast('error', 'Pembayaran gagal diproses. Silakan coba lagi atau cek status pembayaran.');
+            },
+            onClose: function () {
+                showToast('info', 'Popup pembayaran ditutup. Anda bisa lanjutkan kapan saja sebelum waktu habis.');
+            }
         });
+    };
+
+    if (payDpButton) {
+        payDpButton.addEventListener('click', openSnapPayment);
+
+        if (shouldAutoOpenSnap) {
+            window.setTimeout(openSnapPayment, 400);
+        }
     }
 
     if (!countdownEl) {

@@ -250,7 +250,8 @@ class BookingController extends Controller
             $booking->update($this->buildBookingPaymentUpdatePayload($transaction));
 
             return redirect()->route('my-booking')
-                ->with('success', 'Booking berhasil dibuat. Silakan selesaikan pembayaran DP dalam 30 menit.');
+                ->with('success', 'Booking berhasil dibuat. Silakan selesaikan pembayaran DP dalam 30 menit.')
+                ->with('open_midtrans_on_load', true);
         } catch (\Throwable $exception) {
             Log::error('Gagal membuat transaksi Midtrans saat booking.', [
                 'user_id' => Auth::id(),
@@ -259,7 +260,8 @@ class BookingController extends Controller
             ]);
 
             return redirect()->route('my-booking')
-                ->with('error', 'Booking berhasil dibuat, tetapi transaksi pembayaran sedang disiapkan. Silakan buka kembali My Booking dalam beberapa detik.');
+                ->with('error', 'Booking berhasil dibuat, tetapi transaksi pembayaran sedang disiapkan. Silakan buka kembali My Booking dalam beberapa detik.')
+                ->with('open_midtrans_on_load', true);
         }
     }
 
