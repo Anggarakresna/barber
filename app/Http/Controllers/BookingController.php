@@ -250,8 +250,7 @@ class BookingController extends Controller
             $booking->update($this->buildBookingPaymentUpdatePayload($transaction));
 
             return redirect()->route('my-booking')
-                ->with('success', 'Booking berhasil dibuat. Silakan selesaikan pembayaran DP dalam 30 menit.')
-                ->with('open_midtrans_on_load', true);
+                ->with('success', 'Booking berhasil dibuat. Silakan selesaikan pembayaran DP dalam 30 menit di panel My Booking.');
         } catch (\Throwable $exception) {
             Log::error('Gagal membuat transaksi Midtrans saat booking.', [
                 'user_id' => Auth::id(),
@@ -260,8 +259,7 @@ class BookingController extends Controller
             ]);
 
             return redirect()->route('my-booking')
-                ->with('error', 'Booking berhasil dibuat, tetapi transaksi pembayaran sedang disiapkan. Silakan buka kembali My Booking dalam beberapa detik.')
-                ->with('open_midtrans_on_load', true);
+                ->with('error', 'Booking berhasil dibuat, tetapi transaksi pembayaran sedang disiapkan. Silakan refresh halaman My Booking dalam beberapa detik.');
         }
     }
 
@@ -578,7 +576,7 @@ class BookingController extends Controller
             'total_people',
         ];
 
-        return array_values(array_filter($requiredColumns, fn ($column) => !Schema::hasColumn('bookings', $column)));
+        return array_values(array_filter($requiredColumns, fn($column) => !Schema::hasColumn('bookings', $column)));
     }
 
     /**
@@ -586,7 +584,8 @@ class BookingController extends Controller
      */
     private function hasMidtransConfiguration(): bool
     {
-        return filled(config('services.midtrans.server_key')) && filled(config('services.midtrans.client_key'));
+        return filled(config('midtrans.server_key', config('services.midtrans.server_key')))
+            && filled(config('midtrans.client_key', config('services.midtrans.client_key')));
     }
 
     /**

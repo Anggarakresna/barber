@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Services\MidtransService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -170,6 +171,58 @@ class PaymentController extends Controller
     }
 
     /**
+     * Re-create Midtrans DP transaction for failed or expired payment.
+     */
+    public function retryPayment(Booking $booking)
+    {
+        $this->authorizeBookingOwner($booking);
+
+        $this->expireExpiredWaitingPaymentBookingsForAuthenticatedUser();
+        $booking->refresh();
+
+        if ($booking->payment_status === Booking::PAYMENT_STATUS_PAID || $booking->status === Booking::STATUS_CONFIRMED) {
+            return redirect()->route('my-booking')
+                ->with('success', 'DP booking ini sudah dibayar.');
+        }
+
+        $isMidtransFailed = $booking->payment_status === Booking::PAYMENT_STATUS_CANCELLED
+            && in_array((string) $booking->midtrans_transaction_status, ['cancel', 'deny', 'failure'], true);
+        $isRetryable = $booking->payment_status === Booking::PAYMENT_STATUS_EXPIRED || $isMidtransFailed;
+
+        if (!$isRetryable) {
+            return redirect()->route('my-booking')
+                ->with('error', 'Booking ini tidak memerlukan bayar ulang.');
+        }
+
+        if (!$this->isBookingTimeStillValid($booking)) {
+            return redirect()->route('my-booking')
+                ->with('error', 'Waktu booking sudah lewat sehingga pembayaran tidak dapat diulang. Silakan buat booking baru.');
+        }
+
+        if (!$this->canCreateWaitingPaymentBooking()) {
+            return redirect()->route('my-booking')
+                ->with('error', 'Konfigurasi Midtrans belum siap. Periksa MIDTRANS_SERVER_KEY, MIDTRANS_CLIENT_KEY, dan migrasi database.');
+        }
+
+        $booking->update([
+            'status' => Booking::STATUS_WAITING_PAYMENT,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
+        ]);
+
+        $booking->refresh();
+        $this->ensureSnapTransactionExists($booking);
+        $booking->refresh();
+
+        if (empty($booking->midtrans_snap_token)) {
+            return redirect()->route('my-booking')
+                ->with('error', 'Gagal menyiapkan transaksi Midtrans untuk bayar ulang. Coba lagi dalam beberapa saat.');
+        }
+
+        return redirect()->route('my-booking')
+            ->with('success', 'Transaksi DP baru berhasil dibuat. Silakan lanjutkan pembayaran.');
+    }
+
+    /**
      * Complete payment flow from Snap JavaScript callback and update booking immediately.
      */
     public function completePaymentFromSnap(Request $request, Booking $booking)
@@ -178,6 +231,7 @@ class PaymentController extends Controller
 
         $validated = $request->validate([
             'order_id' => ['nullable', 'string'],
+            'transaction_id' => ['nullable', 'string'],
             'transaction_status' => ['nullable', 'string'],
             'fraud_status' => ['nullable', 'string'],
             'status_code' => ['nullable'],
@@ -433,30 +487,31 @@ class PaymentController extends Controller
     {
         $transactionStatus = (string) ($payload['transaction_status'] ?? '');
         $fraudStatus = (string) ($payload['fraud_status'] ?? '');
+        $midtransReferencePayload = $this->buildMidtransReferenceUpdatePayload($payload);
 
         if (in_array($transactionStatus, ['capture', 'settlement'], true)) {
             if ($transactionStatus === 'capture' && $fraudStatus === 'challenge') {
-                $booking->update([
+                $booking->update(array_merge($midtransReferencePayload, [
                     'status' => Booking::STATUS_WAITING_PAYMENT,
                     'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
-                ]);
+                ]));
 
                 return;
             }
 
-            $booking->update([
+            $booking->update(array_merge($midtransReferencePayload, [
                 'status' => Booking::STATUS_CONFIRMED,
                 'payment_status' => Booking::PAYMENT_STATUS_PAID,
-            ]);
+            ]));
 
             return;
         }
 
         if (in_array($transactionStatus, ['pending'], true)) {
-            $booking->update([
+            $booking->update(array_merge($midtransReferencePayload, [
                 'status' => Booking::STATUS_WAITING_PAYMENT,
                 'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
-            ]);
+            ]));
 
             return;
         }
@@ -466,7 +521,13 @@ class PaymentController extends Controller
                 ? Booking::PAYMENT_STATUS_EXPIRED
                 : Booking::PAYMENT_STATUS_CANCELLED;
 
-            $this->markBookingAsCancelled($booking, $paymentStatus);
+            $this->markBookingAsCancelled($booking, $paymentStatus, $midtransReferencePayload);
+
+            return;
+        }
+
+        if (!empty($midtransReferencePayload)) {
+            $booking->update($midtransReferencePayload);
         }
     }
 
@@ -481,12 +542,12 @@ class PaymentController extends Controller
     /**
      * Mark waiting payment booking as cancelled and store payment status detail.
      */
-    private function markBookingAsCancelled(Booking $booking, string $paymentStatus): void
+    private function markBookingAsCancelled(Booking $booking, string $paymentStatus, array $extraPayload = []): void
     {
-        $booking->update([
+        $booking->update(array_merge($extraPayload, [
             'status' => Booking::STATUS_CANCELLED,
             'payment_status' => $paymentStatus,
-        ]);
+        ]));
     }
 
     /**
@@ -614,6 +675,50 @@ class PaymentController extends Controller
     }
 
     /**
+     * Validate booking date/time before allowing payment retry.
+     */
+    private function isBookingTimeStillValid(Booking $booking): bool
+    {
+        $bookingDate = $booking->booking_date instanceof Carbon
+            ? $booking->booking_date->toDateString()
+            : (string) $booking->booking_date;
+        $bookingTime = Carbon::parse((string) $booking->booking_time)->format('H:i:s');
+        $bookingDateTime = Carbon::parse($bookingDate . ' ' . $bookingTime, 'Asia/Jakarta');
+
+        return $bookingDateTime->greaterThan(now('Asia/Jakarta'));
+    }
+
+    /**
+     * Build Midtrans reference payload for available columns.
+     */
+    private function buildMidtransReferenceUpdatePayload(array $payload): array
+    {
+        $updates = [];
+
+        $orderId = trim((string) ($payload['order_id'] ?? ''));
+        if ($orderId !== '' && $this->hasBookingColumns(['midtrans_order_id'])) {
+            $updates['midtrans_order_id'] = $orderId;
+        }
+
+        $transactionId = trim((string) ($payload['transaction_id'] ?? ''));
+        if ($transactionId !== '' && $this->hasBookingColumns(['midtrans_transaction_id'])) {
+            $updates['midtrans_transaction_id'] = $transactionId;
+        }
+
+        $transactionStatus = trim((string) ($payload['transaction_status'] ?? ''));
+        if ($transactionStatus !== '' && $this->hasBookingColumns(['midtrans_transaction_status'])) {
+            $updates['midtrans_transaction_status'] = $transactionStatus;
+        }
+
+        $paymentType = trim((string) ($payload['payment_type'] ?? ''));
+        if ($paymentType !== '' && $this->hasBookingColumns(['midtrans_payment_type'])) {
+            $updates['midtrans_payment_type'] = $paymentType;
+        }
+
+        return $updates;
+    }
+
+    /**
      * Build payment update payload for columns that exist in the database.
      */
     private function buildBookingPaymentUpdatePayload(array $transaction): array
@@ -626,6 +731,18 @@ class PaymentController extends Controller
 
         if ($this->hasBookingColumns(['midtrans_snap_token'])) {
             $payload['midtrans_snap_token'] = $transaction['snap_token'];
+        }
+
+        if ($this->hasBookingColumns(['midtrans_transaction_id'])) {
+            $payload['midtrans_transaction_id'] = null;
+        }
+
+        if ($this->hasBookingColumns(['midtrans_transaction_status'])) {
+            $payload['midtrans_transaction_status'] = null;
+        }
+
+        if ($this->hasBookingColumns(['midtrans_payment_type'])) {
+            $payload['midtrans_payment_type'] = null;
         }
 
         if ($this->hasBookingColumns(['payment_expired_at'])) {

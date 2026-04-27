@@ -47,6 +47,7 @@ Route::middleware('auth.check')->group(function () {
     Route::post('/booking/{booking}/payment/sync', [PaymentController::class, 'syncPaymentStatus'])->name('booking.paymentSync');
     Route::post('/booking/{booking}/payment/sync-json', [PaymentController::class, 'syncPaymentStatusJson'])->name('booking.paymentSyncJson');
     Route::post('/booking/{booking}/payment/complete', [PaymentController::class, 'completePaymentFromSnap'])->name('booking.paymentComplete');
+    Route::post('/booking/{booking}/payment/retry', [PaymentController::class, 'retryPayment'])->name('booking.paymentRetry');
     Route::patch('/booking/{booking}/cancel', [BookingController::class, 'cancel'])->name('booking.cancel');
     Route::get('/booking/barbers-by-branch/{branch}', [BookingController::class, 'barbersByBranch'])->name('booking.barbersByBranch');
     Route::get('/booking/available-times', [BookingController::class, 'availableTimes'])->name('booking.availableTimes');

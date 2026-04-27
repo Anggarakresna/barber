@@ -20,21 +20,29 @@
     @php
         $paymentExpiredAt = $waitingPaymentBooking->payment_expired_at ?? $waitingPaymentBooking->payment_deadline;
     @endphp
-    <div class="card border-0 shadow-lg mb-4 text-white" style="background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #0891b2 100%);">
+    <div id="dp-payment-panel" class="card border-0 shadow-lg mb-4 text-white" style="background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #0891b2 100%);">
         <div class="card-body p-4 p-lg-5">
-            <div class="row g-4 align-items-center">
-                <div class="col-lg-4 text-center">
-                    <div class="bg-white rounded-4 p-3 shadow-sm d-inline-block">
-                        <img
-                            src="{{ asset('images/qris-dp.svg') }}"
-                            alt="QRIS Pembayaran DP"
-                            class="img-fluid rounded-3"
-                            style="max-width: 220px;"
-                        >
+            <div class="row g-4 align-items-stretch">
+                <div class="col-lg-5">
+                    <div class="bg-white rounded-4 p-3 shadow-sm h-100 d-flex flex-column">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <span class="badge bg-dark">QRIS Diprioritaskan</span>
+                            <span class="small text-muted">Midtrans Snap</span>
+                        </div>
+
+                        <div
+                            id="snap-embed-container"
+                            class="border rounded-3 overflow-hidden bg-white flex-grow-1"
+                            style="min-height: 420px;"
+                        ></div>
+
+                        <div id="snap-embed-fallback" class="small text-muted mt-3 d-none">
+                            Mode embed belum tersedia di browser ini. Gunakan tombol popup pembayaran.
+                        </div>
                     </div>
-                    <p class="small text-white-50 mt-3 mb-0">Bayar DP via Midtrans: QRIS, GoPay, ShopeePay, VA, dan metode lainnya.</p>
+                    <p class="small text-white-50 mt-3 mb-0">Silakan scan QRIS untuk bayar DP. Metode lain tetap tersedia dari Midtrans.</p>
                 </div>
-                <div class="col-lg-8">
+                <div class="col-lg-7">
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <span class="badge bg-warning text-dark">Menunggu Pembayaran</span>
                         <span class="badge bg-light text-dark">DP Midtrans</span>
@@ -82,16 +90,17 @@
                             >
                                 30:00
                             </div>
+                            <div class="small text-white-50 mt-2">Status: Menunggu Pembayaran</div>
                         </div>
 
                         <div class="d-flex flex-column flex-sm-row gap-2">
                             <button
                                 type="button"
                                 id="pay-dp-button"
-                                class="btn btn-warning btn-lg px-4 fw-semibold"
+                                class="btn btn-warning btn-lg px-4 fw-semibold d-none"
                                 data-snap-token="{{ $waitingPaymentBooking->midtrans_snap_token }}"
                             >
-                                <i class="fas fa-wallet me-2"></i>Bayar DP Sekarang
+                                <i class="fas fa-wallet me-2"></i>Buka Popup Pembayaran
                             </button>
 
                             <form action="{{ route('booking.paymentSync', $waitingPaymentBooking) }}" method="POST" class="m-0">
@@ -102,10 +111,6 @@
                             </form>
                         </div>
                     </div>
-
-                    <form id="sync-payment-form" action="{{ route('booking.paymentSync', $waitingPaymentBooking) }}" method="POST" class="d-none">
-                            @csrf
-                    </form>
                 </div>
             </div>
         </div>
@@ -142,6 +147,19 @@
                     </thead>
                     <tbody>
                         @foreach($bookings as $booking)
+                            @php
+                                $bookingDateTime = \Carbon\Carbon::parse(
+                                    $booking->booking_date->format('Y-m-d') . ' ' . \Carbon\Carbon::parse($booking->booking_time)->format('H:i:s'),
+                                    'Asia/Jakarta'
+                                );
+
+                                $isMidtransFailed = $booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_CANCELLED
+                                    && in_array((string) $booking->midtrans_transaction_status, ['cancel', 'deny', 'failure'], true);
+
+                                $canRetryPayment = ($booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_EXPIRED || $isMidtransFailed)
+                                    && in_array($booking->status, [\App\Models\Booking::STATUS_CANCELLED, \App\Models\Booking::STATUS_WAITING_PAYMENT], true)
+                                    && $bookingDateTime->isFuture();
+                            @endphp
                             <tr>
                                 <td>{{ ($bookings->currentPage() - 1) * $bookings->perPage() + $loop->iteration }}</td>
                                 <td>{{ $booking->service->name ?? '-' }}</td>
@@ -152,7 +170,7 @@
                                 <td>
                                     @switch($booking->status)
                                         @case(\App\Models\Booking::STATUS_WAITING_PAYMENT)
-                                            <span class="badge bg-danger">Waiting Payment</span>
+                                            <span class="badge bg-warning text-dark">Menunggu Pembayaran</span>
                                             @break
                                         @case('pending')
                                             <span class="badge bg-warning text-dark">Pending</span>
@@ -171,16 +189,25 @@
                                     @endswitch
 
                                     @if($booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_PAID)
-                                        <span class="badge bg-primary ms-1">Paid</span>
+                                        <span class="badge bg-primary ms-1">DP Sudah Dibayar</span>
                                     @elseif($booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_UNPAID && $booking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT)
-                                        <span class="badge bg-light text-dark ms-1">Unpaid</span>
-                                    @elseif(in_array($booking->payment_status, [\App\Models\Booking::PAYMENT_STATUS_EXPIRED, \App\Models\Booking::PAYMENT_STATUS_CANCELLED], true))
-                                        <span class="badge bg-secondary ms-1">{{ ucfirst($booking->payment_status) }}</span>
+                                        <span class="badge bg-light text-dark ms-1">DP Belum Dibayar</span>
+                                    @elseif($booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_EXPIRED)
+                                        <span class="badge bg-secondary ms-1">DP Expired</span>
+                                    @elseif($booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_CANCELLED)
+                                        <span class="badge bg-secondary ms-1">DP Gagal</span>
                                     @endif
                                 </td>
                                 <td>
                                     @if($booking->status === \App\Models\Booking::STATUS_WAITING_PAYMENT && $booking->payment_status === \App\Models\Booking::PAYMENT_STATUS_UNPAID)
-                                        <span class="text-muted small">Gunakan panel pembayaran</span>
+                                        <span class="text-muted small">Panel pembayaran aktif</span>
+                                    @elseif($canRetryPayment)
+                                        <form action="{{ route('booking.paymentRetry', $booking) }}" method="POST" class="d-inline">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-warning text-dark">
+                                                <i class="fas fa-rotate me-1"></i> Bayar Ulang
+                                            </button>
+                                        </form>
                                     @elseif(in_array($booking->status, ['pending', 'confirmed']))
                                         <form action="{{ route('booking.cancel', $booking) }}" method="POST"
                                               onsubmit="return confirm('Yakin ingin membatalkan booking ini?')">
@@ -244,21 +271,15 @@
     @endif
 
     const countdownEl = document.getElementById('payment-countdown');
+    const paymentPanel = document.getElementById('dp-payment-panel');
+    const snapEmbedContainer = document.getElementById('snap-embed-container');
+    const snapEmbedFallback = document.getElementById('snap-embed-fallback');
     const payDpButton = document.getElementById('pay-dp-button');
-    const syncPaymentForm = document.getElementById('sync-payment-form');
     const syncPaymentJsonUrl = @json($waitingPaymentBooking ? route('booking.paymentSyncJson', $waitingPaymentBooking) : null);
     const completePaymentUrl = @json($waitingPaymentBooking ? route('booking.paymentComplete', $waitingPaymentBooking) : null);
     const myBookingsUrl = @json(route('my-booking'));
-    const shouldAutoOpenSnap = @json((bool) session('open_midtrans_on_load'));
+    const preferredPaymentType = @json(config('midtrans.preferred_payment_type', 'qris'));
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-    const syncPaymentStatus = () => {
-        if (!syncPaymentForm) {
-            return;
-        }
-
-        syncPaymentForm.submit();
-    };
 
     const syncPaymentStatusJson = async () => {
         if (!syncPaymentJsonUrl || !csrfToken) {
@@ -310,6 +331,71 @@
         window.location.href = myBookingsUrl || '/my-bookings';
     };
 
+    const handleResolvedPaymentState = (result) => {
+        if (!result || !result.state) {
+            return false;
+        }
+
+        if (result.state === 'paid' || result.state === 'updated' || result.state === 'cancelled') {
+            redirectToMyBookings();
+            return true;
+        }
+
+        return false;
+    };
+
+    const verifyPaymentState = async (payload = null) => {
+        if (payload) {
+            try {
+                const completion = await completePaymentFromSnap(payload);
+
+                if (handleResolvedPaymentState(completion)) {
+                    return;
+                }
+            } catch (error) {
+                // Continue with direct sync fallback below.
+            }
+        }
+
+        try {
+            const syncResult = await syncPaymentStatusJson();
+
+            if (handleResolvedPaymentState(syncResult)) {
+                return;
+            }
+
+            if (syncResult && syncResult.state === 'pending') {
+                showToast('info', 'Status DP: Menunggu Pembayaran.');
+            }
+        } catch (error) {
+            // Silent fallback: webhook will still update payment state.
+        }
+    };
+
+    const buildSnapCallbacks = () => ({
+        selectedPaymentType: preferredPaymentType || 'qris',
+        onSuccess: async function (result) {
+            if (payDpButton) {
+                payDpButton.disabled = true;
+                payDpButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memverifikasi...';
+            }
+
+            await verifyPaymentState(result);
+            redirectToMyBookings();
+        },
+        onPending: async function (result) {
+            await verifyPaymentState(result);
+            showToast('info', 'Pembayaran masih pending. Silakan selesaikan pembayaran sebelum batas waktu habis.');
+        },
+        onError: async function () {
+            await verifyPaymentState();
+            showToast('error', 'Pembayaran gagal diproses. Silakan coba lagi atau klik bayar ulang saat status expired.');
+        },
+        onClose: function () {
+            showToast('info', 'Panel pembayaran ditutup. Anda bisa melanjutkan pembayaran sebelum batas waktu habis.');
+        }
+    });
+
     const openSnapPayment = () => {
         if (!payDpButton) {
             return;
@@ -327,69 +413,58 @@
             return;
         }
 
-        window.snap.pay(snapToken, {
-            onSuccess: async function (result) {
-                payDpButton.disabled = true;
-                payDpButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memverifikasi...';
+        window.snap.pay(snapToken, buildSnapCallbacks());
+    };
 
-                try {
-                    const completion = await completePaymentFromSnap(result);
+    const showPopupFallback = () => {
+        if (payDpButton) {
+            payDpButton.classList.remove('d-none');
+        }
 
-                    if (completion && completion.state === 'paid') {
-                        redirectToMyBookings();
-                        return;
-                    }
-                } catch (error) {
-                    // Fallback to payment sync below.
-                }
+        if (snapEmbedFallback) {
+            snapEmbedFallback.classList.remove('d-none');
+        }
+    };
 
-                try {
-                    const syncResult = await syncPaymentStatusJson();
+    const mountSnapEmbed = () => {
+        if (!payDpButton || !snapEmbedContainer) {
+            return false;
+        }
 
-                    if (syncResult && (syncResult.state === 'paid' || syncResult.state === 'updated')) {
-                        redirectToMyBookings();
-                        return;
-                    }
-                } catch (error) {
-                    // Continue to redirect so customer returns to My Booking page.
-                }
+        const snapToken = payDpButton.dataset.snapToken;
 
-                redirectToMyBookings();
-            },
-            onPending: async function () {
-                try {
-                    await syncPaymentStatusJson();
-                } catch (error) {
-                    // Keep pending flow on page even if sync temporarily fails.
-                }
+        if (!snapToken || !window.snap || typeof window.snap.embed !== 'function') {
+            return false;
+        }
 
-                showToast('info', 'Pembayaran masih pending. Silakan selesaikan pembayaran sebelum batas waktu habis.');
-            },
-            onError: async function () {
-                try {
-                    const result = await syncPaymentStatusJson();
+        snapEmbedContainer.innerHTML = '';
+        window.snap.embed(snapToken, Object.assign(buildSnapCallbacks(), {
+            embedId: 'snap-embed-container',
+        }));
 
-                    if (result && result.state === 'cancelled') {
-                        redirectToMyBookings();
-                        return;
-                    }
-                } catch (error) {
-                    // Keep current page and show error toast below.
-                }
-
-                showToast('error', 'Pembayaran gagal diproses. Silakan coba lagi atau cek status pembayaran.');
-            },
-            onClose: function () {
-                showToast('info', 'Popup pembayaran ditutup. Anda bisa lanjutkan kapan saja sebelum waktu habis.');
-            }
-        });
+        return true;
     };
 
     if (payDpButton) {
         payDpButton.addEventListener('click', openSnapPayment);
+    }
 
-        if (shouldAutoOpenSnap) {
-            window.setTimeout(openSnapPayment, 400);
+    if (paymentPanel) {
+        const embedded = mountSnapEmbed();
+
+        if (!embedded) {
+            showPopupFallback();
+        }
+
+        if (syncPaymentJsonUrl) {
+            window.setInterval(async () => {
+                try {
+                    const syncResult = await syncPaymentStatusJson();
+                    handleResolvedPaymentState(syncResult);
+                } catch (error) {
+                    // Keep polling in the background while waiting for webhook updates.
+                }
+            }, 12000);
         }
     }
 

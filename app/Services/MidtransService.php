@@ -60,6 +60,7 @@ class MidtransService
                 'order_id' => $orderId,
                 'gross_amount' => (int) ($booking->dp_amount ?: 20000),
             ],
+            'enabled_payments' => $this->getEnabledPayments(),
             'customer_details' => [
                 'first_name' => $booking->user->name,
                 'email' => $booking->user->email,
@@ -142,5 +143,27 @@ class MidtransService
     private function generateOrderId(Booking $booking): string
     {
         return 'BOOKING-' . $booking->id . '-' . Str::upper(Str::random(8));
+    }
+
+    /**
+     * Resolve enabled Snap payment methods with QRIS prioritized.
+     *
+     * @return array<int, string>
+     */
+    private function getEnabledPayments(): array
+    {
+        $configured = config('midtrans.enabled_payments', []);
+
+        if (!is_array($configured) || empty($configured)) {
+            return ['qris', 'gopay', 'shopeepay', 'bca_va', 'bni_va', 'bri_va', 'permata_va', 'other_va'];
+        }
+
+        $normalized = array_values(array_filter(array_map(static fn($value) => trim((string) $value), $configured)));
+
+        if (empty($normalized)) {
+            return ['qris'];
+        }
+
+        return $normalized;
     }
 }
